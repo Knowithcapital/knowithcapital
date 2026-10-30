@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 // AMFI publishes NAVs once per business day, so the computed report is cached
 // for a day. The daily market-data cron also expires this tag (see ../generate).
-const getCachedReport = unstable_cache(generateIndianFundReport, ['indian-mf-report-v2'], {
+const getCachedReport = unstable_cache(generateIndianFundReport, ['indian-mf-report-v3'], {
   tags: [INDIAN_MF_CACHE_TAG],
   revalidate: 86400,
 });

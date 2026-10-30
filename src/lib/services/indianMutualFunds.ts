@@ -1,16 +1,15 @@
 // ────────────────────────────────────────────────────────────────
-// Indian Mutual Fund & ETF Performance — built from AMFI's official NAV files.
+// Indian Mutual Fund & ETF Performance — built from AMFI data.
 //
 // Sources (all public, no key):
 //   • AMFI daily NAV file  — every open-ended scheme, its SEBI category and latest NAV
-//   • AMFI NAV history     — NAVs for a date window, all schemes in one file (1Y / 3Y / 5Y returns)
-//   • mfapi.in             — full NAV history per scheme (itself compiled from AMFI), used for the
-//                            short-term / 10Y returns, SIP returns and NAV-based risk measures
-//   • TigZig MF API        — AUM, riskometer, benchmark, fund managers, expense ratio, exit load
-//                            per scheme (itself compiled from AMFI / SEBI filings)
+//   • TigZig MF API        — NAV history for every scheme (a republished copy of AMFI's NAV records;
+//                            used for all returns, SIP and risk measures) plus AUM, riskometer,
+//                            benchmark, fund managers, expense ratio and exit load
+//   • mfapi.in             — per-scheme NAV history, only used for a scheme TigZig did not return
 //
-// mfapi.in and TigZig are optional enrichment: when either is down the page still works and the
-// affected columns show "—".
+// TigZig and mfapi.in are third-party free services: when they are down the page still lists the
+// funds from AMFI and the affected columns show "—".
 //
 // Only the Regular plan (Growth option) is listed — Direct plans are not shown.
 //
@@ -20,14 +19,14 @@
 // ────────────────────────────────────────────────────────────────
 
 const AMFI_NAV_ALL_URL = 'https://portal.amfiindia.com/spages/NAVAll.txt';
-const AMFI_NAV_HISTORY_URL = 'https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.aspx';
 const TIGZIG_DETAILS_URL = 'https://api.tigzig.com/mf/v1/details';
+const TIGZIG_NAV_URL = 'https://api.tigzig.com/mf/v1/nav';
 const MFAPI_URL = 'https://api.mfapi.in/mf';
 
 export const INDIAN_MF_CACHE_TAG = 'indian-mf-report';
 
-// AMFI-window horizons (official files). Everything else comes from mfapi.in.
-const AMFI_HORIZONS = [1, 3, 5] as const;
+// Whole report must finish inside the route's 60s limit
+const BUILD_BUDGET_MS = 50000;
 
 // Risk-free rate used for the Sharpe ratio (approx. 91-day T-bill / repo-linked), in %
 const RISK_FREE_PCT = 6.5;
@@ -94,6 +93,14 @@ export interface IndianFundReport {
     funds: FundPerformance[];   // every fund in the category, best 1Y return first
   }[];
   sources: string[];
+  /** How the build went (counts only); lets a bad day be diagnosed from the API response. */
+  diagnostics?: {
+    schemes: number;
+    historyFromTigzig: number;
+    historyFromMfapi: number;
+    historyMissing: number;
+    buildSeconds: number;
+  };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -107,10 +114,6 @@ function parseAmfiDate(s: string): Date | null {
   const month = MONTHS.indexOf(m[2][0].toUpperCase() + m[2].slice(1).toLowerCase());
   if (month < 0) return null;
   return new Date(Date.UTC(+m[3], month, +m[1]));
-}
-
-function formatAmfiDate(d: Date): string {
-  return `${String(d.getUTCDate()).padStart(2, '0')}-${MONTHS[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
 }
 
 /** Same calendar day `n` months earlier (clamped to the month's last day). */
@@ -239,55 +242,91 @@ function parseNavAll(text: string): SchemeRow[] {
   return rows;
 }
 
-// ── AMFI NAV history (one window around a target date) ─────────
+// ── NAV history (bulk from TigZig, per-scheme mfapi.in as a fallback) ──
 
-/** Returns schemeCode → NAV on the latest date <= target within a 7-day lookback. */
-async function fetchNavsOnOrBefore(target: Date): Promise<Map<string, number>> {
-  const from = new Date(target);
-  from.setUTCDate(from.getUTCDate() - 7);
-  const url = `${AMFI_NAV_HISTORY_URL}?frmdt=${formatAmfiDate(from)}&todt=${formatAmfiDate(target)}`;
-  const text = await fetchText(url);
+type NavHistory = { times: number[]; navs: number[]; firstDate?: string }; // ascending
 
-  const best = new Map<string, { date: number; nav: number }>();
-  for (const line of text.split(/\r?\n/)) {
-    const cols = line.split(';');
-    if (cols.length < 8) continue;
-    const code = cols[0].trim();
-    const nav = parseFloat(cols[6]);
-    const date = parseAmfiDate(cols[7]);
-    if (!/^\d+$/.test(code) || !(nav > 0) || !date || date > target) continue;
-    const prev = best.get(code);
-    if (!prev || date.getTime() > prev.date) best.set(code, { date: date.getTime(), nav });
-  }
-  return new Map([...best].map(([code, v]) => [code, v.nav]));
+/** Counts how each source did, returned with the report so a bad day is easy to diagnose. */
+interface HistoryStats { tigzig: number; mfapi: number; missing: number }
+
+/** TigZig bulk NAV: up to 50 schemes per call, ISO dates, oldest first. */
+async function fetchHistoriesTigzig(codes: string[], since: string, deadline: number): Promise<Map<string, NavHistory>> {
+  const out = new Map<string, NavHistory>();
+  const batches: string[][] = [];
+  for (let i = 0; i < codes.length; i += 40) batches.push(codes.slice(i, i + 40));
+
+  await mapLimit(batches, 5, async batch => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const remaining = deadline - Date.now();
+      if (remaining < 4000) return;
+      try {
+        const res = await fetch(`${TIGZIG_NAV_URL}?schemes=${batch.join(',')}&since=${since}`, {
+          signal: AbortSignal.timeout(Math.min(40000, remaining)),
+          cache: 'no-store',
+        });
+        if (!res.ok) continue;
+        const json = await res.json();
+        for (const s of json?.schemes ?? []) {
+          const data: { date: string; nav: number }[] = s?.data ?? [];
+          const times: number[] = [];
+          const navs: number[] = [];
+          for (const p of data) {
+            const [y, m, d] = String(p.date).split('-').map(Number);
+            const nav = Number(p.nav);
+            if (!(nav > 0) || !y || !m || !d) continue;
+            times.push(Date.UTC(y, m - 1, d));
+            navs.push(nav);
+          }
+          if (times.length > 1 && times[0] > times[times.length - 1]) { times.reverse(); navs.reverse(); }
+          if (times.length > 1) out.set(String(s.scheme_code), { times, navs, firstDate: s.first_available_date ?? undefined });
+        }
+        return;
+      } catch (err) {
+        if (attempt === 1) console.warn('[IndianMF] NAV history batch failed:', (err as Error).message);
+      }
+    }
+  });
+  return out;
 }
 
-// ── mfapi.in: NAV-history based metrics (best effort) ──────────
-
-type NavHistory = { times: number[]; navs: number[] }; // ascending
-
-async function fetchNavHistory(code: string): Promise<NavHistory | null> {
+/** mfapi.in: one scheme per call, newest first, dd-mm-yyyy dates. */
+async function fetchHistoryMfapi(code: string, deadline: number): Promise<NavHistory | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 3000) return null;
     try {
-      const res = await fetch(`${MFAPI_URL}/${code}`, { signal: AbortSignal.timeout(15000), cache: 'no-store' });
+      const res = await fetch(`${MFAPI_URL}/${code}`, { signal: AbortSignal.timeout(Math.min(15000, remaining)), cache: 'no-store' });
       if (!res.ok) continue;
       const json = await res.json();
       const data: { date: string; nav: string }[] = json?.data ?? [];
       const times: number[] = [];
       const navs: number[] = [];
-      for (let i = data.length - 1; i >= 0; i--) { // API is newest-first
+      for (let i = data.length - 1; i >= 0; i--) {
         const [d, m, y] = data[i].date.split('-').map(Number);
         const nav = parseFloat(data[i].nav);
         if (!(nav > 0) || !d || !m || !y) continue;
         times.push(Date.UTC(y, m - 1, d));
         navs.push(nav);
       }
-      return times.length > 1 ? { times, navs } : null;
+      return times.length > 1 ? { times, navs, firstDate: new Date(times[0]).toISOString().slice(0, 10) } : null;
     } catch {
       /* retry once */
     }
   }
   return null;
+}
+
+async function loadHistories(codes: string[], since: string, deadline: number): Promise<{ histories: Map<string, NavHistory>; stats: HistoryStats }> {
+  const histories = await fetchHistoriesTigzig(codes, since, deadline);
+  const tigzig = histories.size;
+
+  // Anything TigZig did not return is retried one by one against mfapi.in while time allows
+  const missing = codes.filter(c => !histories.has(c));
+  await mapLimit(missing, 12, async code => {
+    const h = await fetchHistoryMfapi(code, deadline);
+    if (h) histories.set(code, h);
+  });
+  return { histories, stats: { tigzig, mfapi: histories.size - tigzig, missing: codes.length - histories.size } };
 }
 
 /** Index of the last point on or before `t`, or -1 when the history starts later. */
@@ -338,8 +377,8 @@ function consistentSeries(h: NavHistory): { series: NavHistory; validFrom: numbe
   return { series: { times: h.times.slice(cut), navs: h.navs.slice(cut) }, validFrom: h.times[cut] };
 }
 
-function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' | 'sip' | 'risk' | 'launchDate'> & { validFrom: number } {
-  const { series: h, validFrom } = consistentSeries(full);
+function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' | 'sip' | 'risk'> {
+  const { series: h } = consistentSeries(full);
   const last = h.times.length - 1;
   const latest = new Date(h.times[last]);
   const latestNav = h.navs[last];
@@ -350,14 +389,16 @@ function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' |
     return idx < 0 ? undefined : h.navs[idx];
   };
 
-  for (const [key, months] of [['1m', 1], ['3m', 3], ['6m', 6]] as const) {
+  for (const [key, months] of [['1m', 1], ['3m', 3], ['6m', 6], ['1y', 12]] as const) {
     const past = navAt(monthsBefore(latest, months));
     if (past) returns[key] = round2((latestNav / past - 1) * 100);
   }
   const yearEnd = navAt(new Date(Date.UTC(latest.getUTCFullYear() - 1, 11, 31)));
   if (yearEnd) returns.ytd = round2((latestNav / yearEnd - 1) * 100);
-  const tenYear = navAt(yearsBefore(latest, 10));
-  if (tenYear) returns['10y'] = round2((Math.pow(latestNav / tenYear, 1 / 10) - 1) * 100);
+  for (const [key, years] of [['3y', 3], ['5y', 5], ['10y', 10]] as const) {
+    const past = navAt(yearsBefore(latest, years));
+    if (past) returns[key] = round2((Math.pow(latestNav / past, 1 / years) - 1) * 100);
+  }
 
   const sip: FundPerformance['sip'] = {};
   for (const [key, months] of [['1y', 12], ['3y', 36], ['5y', 60]] as const) {
@@ -393,7 +434,7 @@ function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' |
   risk.high52 = Math.max(...recent);
   risk.low52 = Math.min(...recent);
 
-  return { returns, sip, risk, launchDate: new Date(full.times[0]).toISOString().slice(0, 10), validFrom };
+  return { returns, sip, risk };
 }
 
 // ── Optional TigZig enrichment: AUM, riskometer, managers, fees ─
@@ -459,36 +500,18 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
   const live = rows.filter(r => r.navDate.getTime() >= staleCutoff);
   const codes = live.map(r => r.code);
 
-  // Everything below runs concurrently: official 1Y/3Y/5Y NAVs (required), plus best-effort enrichment
-  const historical = new Map<number, Map<string, number>>();
-  const required = Promise.all(AMFI_HORIZONS.map(async h => {
-    historical.set(h, await fetchNavsOnOrBefore(yearsBefore(latest, h)));
-  }));
-  const detailsPromise = fetchSchemeDetails(codes);
-
-  // mfapi.in is time-boxed so a slow day never blocks the report
-  const histories = new Map<string, ReturnType<typeof metricsFromHistory>>();
-  const mfapiDeadline = startedAt + 45000;
-  const metricsPromise = mapLimit(codes, 24, async code => {
-    if (Date.now() > mfapiDeadline) return;
-    const h = await fetchNavHistory(code);
-    if (h) histories.set(code, metricsFromHistory(h));
-  });
-
-  await required;
-  const [details] = await Promise.all([detailsPromise, metricsPromise]);
+  // History (returns, SIP, risk) and scheme details load concurrently inside one time budget
+  const since = new Date(yearsBefore(latest, 10).getTime() - 10 * DAY_MS).toISOString().slice(0, 10);
+  const deadline = startedAt + BUILD_BUDGET_MS;
+  const [details, { histories, stats }] = await Promise.all([
+    fetchSchemeDetails(codes),
+    loadHistories(codes, since, deadline),
+  ]);
+  if (stats.missing > 0) console.warn(`[IndianMF] No NAV history for ${stats.missing} of ${codes.length} schemes`);
 
   const funds = live.map((r): { categoryId: string; fund: FundPerformance } => {
-    const returns: FundPerformance['returns'] = {};
-    const extra = histories.get(r.code);
-    for (const h of AMFI_HORIZONS) {
-      const past = historical.get(h)?.get(r.code);
-      if (!past) continue;
-      // The NAV was re-based (unit split / consolidation) inside this window — not comparable
-      if (extra && yearsBefore(latest, h).getTime() < extra.validFrom) continue;
-      const ratio = r.nav / past;
-      returns[`${h}y`] = round2(h === 1 ? (ratio - 1) * 100 : (Math.pow(ratio, 1 / h) - 1) * 100);
-    }
+    const hist = histories.get(r.code);
+    const extra = hist ? metricsFromHistory(hist) : undefined;
     const det = details.get(r.code);
     return {
       categoryId: r.categoryId,
@@ -498,8 +521,8 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
         amc: r.amc,
         nav: r.nav,
         ...det,
-        launchDate: det?.launchDate ?? extra?.launchDate,
-        returns: { ...extra?.returns, ...returns }, // official AMFI figures win for 1Y/3Y/5Y
+        launchDate: det?.launchDate ?? hist?.firstDate,
+        returns: extra?.returns ?? {},
         sip: extra?.sip && Object.keys(extra.sip).length ? extra.sip : undefined,
         risk: extra?.risk,
       },
@@ -519,9 +542,16 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
     generatedAt: new Date().toISOString(),
     categories,
     sources: [
-      'AMFI India — daily NAV & historical NAV (amfiindia.com)',
-      'NAV history, SIP & risk measures: mfapi.in (AMFI data)',
-      'AUM, riskometer, fund managers & fees: AMFI / SEBI filings via TigZig MF API (api.tigzig.com)',
+      'AMFI India — daily NAV file and scheme categories (amfiindia.com)',
+      'NAV history, returns, SIP & risk measures: AMFI NAV records via TigZig MF API (api.tigzig.com)',
+      'AUM, riskometer, fund managers & fees: AMFI / SEBI filings via TigZig MF API',
     ],
+    diagnostics: {
+      schemes: codes.length,
+      historyFromTigzig: stats.tigzig,
+      historyFromMfapi: stats.mfapi,
+      historyMissing: stats.missing,
+      buildSeconds: Math.round((Date.now() - startedAt) / 100) / 10,
+    },
   };
 }
