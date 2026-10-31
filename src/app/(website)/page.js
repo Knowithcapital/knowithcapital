@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import TestimonialCarousel from '@/components/TestimonialCarousel';
 import HeroFaq from '@/components/HeroFaq';
+import ContactForm from '@/components/ContactForm';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
@@ -40,11 +41,6 @@ export default function Home() {
   }, [amount, returnRate, years]);
 
   const formatCurr = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    alert("This is a demo contact form.");
-  };
 
   return (
     <>
@@ -294,34 +290,6 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* 8. Team */}
-      <section className="section-light">
-        <motion.div 
-          className="container"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-        >
-          <motion.div variants={fadeInUp} className="eyebrow">Leadership</motion.div>
-          <motion.h2 variants={fadeInUp} style={{textAlign: 'center'}}>Guided by Experience</motion.h2>
-          <div className={`hairline-grid hairline-grid-light ${styles.teamGrid}`}>
-            {[
-              { initials: 'PT', name: 'Pradnya Tamhane', role: 'Founder & Principal' },
-              { initials: 'AD', name: 'Placeholder Name', role: 'Head of Research' },
-              { initials: 'RK', name: 'Placeholder Name', role: 'Wealth Manager' }
-            ].map((member, i) => (
-              <motion.div variants={fadeInUp} key={i} className={styles.teamCard}>
-                <div className={styles.avatar}>{member.initials}</div>
-                <h4>{member.name}</h4>
-                <div className={styles.teamRole}>{member.role}</div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
-
-
       {/* 10. Contact (Dark) */}
       <section className="section-dark">
         <motion.div 
@@ -353,13 +321,9 @@ export default function Home() {
               </div>
             </motion.div>
 
-            <motion.form variants={fadeInUp} className={styles.contactForm} onSubmit={handleSubmit}>
-              <input type="text" placeholder="Full Name" className={styles.inputUnderline} required />
-              <input type="email" placeholder="Email Address" className={styles.inputUnderline} required />
-              <input type="tel" placeholder="Phone Number" className={styles.inputUnderline} />
-              <input type="text" placeholder="How can we help?" className={styles.inputUnderline} />
-              <button type="submit" className="btn btn-gold" style={{marginTop: '24px'}}>Send Message</button>
-            </motion.form>
+            <motion.div variants={fadeInUp}>
+              <ContactForm formClassName={styles.contactForm} inputClassName={styles.inputUnderline} />
+            </motion.div>
           </div>
         </motion.div>
       </section>

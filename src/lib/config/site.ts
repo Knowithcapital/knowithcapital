@@ -1,7 +1,12 @@
 // External links used by the login page. Update here when the client confirms them.
 export const SITE_LINKS = {
-  /** Knowith's FundzBazar link for the website — existing clients sign in, new investors sign up */
+  /** Knowith's FundzBazar link for the website — this is the account-opening (sign-up) link for new investors */
   fundzbazarWeb: 'https://fundzbazar.com/Link/UCWewZi9UcM',
+  /**
+   * FundzBazar sign-in page for existing clients. Abhinav asked for a plain login link (the link above only
+   * opens accounts). Paste it here once confirmed; until then existing clients use the link above.
+   */
+  fundzbazarLogin: '',
   /** Knowith's FundzBazar mobile app link */
   fundzbazarApp: 'https://fundzbazar.com/Link/qbGeni6zST0',
   /** QR codes for the same links (shown on desktop so visitors can scan with their phone) */

@@ -10,7 +10,10 @@ import styles from './page.module.css';
 // ── Types (mirror lib/services/indianMutualFunds) ───────────────
 
 type Kind = 'mf' | 'etf';
-type View = 'snapshot' | 'returns' | 'portfolio' | 'risk' | 'details';
+type View = 'snapshot' | 'returns' | 'rolling' | 'portfolio' | 'risk' | 'details';
+type RollWindow = '1y' | '3y' | '5y';
+type RollPeriod = '3y' | '5y';
+type Quartile = 1 | 2 | 3 | 4;
 type ProductTab = Kind | ProductCategory;
 
 interface Fund {
@@ -20,7 +23,8 @@ interface Fund {
   nav: number;
   returns: Partial<Record<'1m' | '3m' | '6m' | 'ytd' | '1y' | '3y' | '5y' | '10y', number>>;
   sip?: Partial<Record<'1y' | '3y' | '5y', number>>;
-  risk?: { volatility?: number; maxDrawdown?: number; sharpe?: number; high52?: number; low52?: number };
+  rolling?: Partial<Record<RollWindow, Partial<Record<RollPeriod, RollingStats>>>>;
+  risk?: { volatility?: number; maxDrawdown?: number; sharpe?: number; high52?: number; low52?: number; volatilityQuartile?: Quartile; sharpeQuartile?: Quartile };
   aumCr?: number;
   riskometer?: string;
   benchmark?: string;
@@ -32,7 +36,10 @@ interface Fund {
   managers?: { name: string; since?: string }[];
 }
 
+interface RollingStats { avg: number; median: number; min: number; max: number; positivePct: number }
+
 interface Report {
+  riskFreeRatePct?: number;
   navDate: string;
   categories: { id: string; label: string; group: string; kind: Kind; count: number; funds: Fund[] }[];
   sources: string[];
@@ -61,6 +68,17 @@ function RiskBadge({ level }: { level?: string }) {
   if (!level) return <>—</>;
   const color = RISK_COLORS[level.toLowerCase()] ?? 'var(--slate)';
   return <span className={styles.riskBadge} style={{ color, borderColor: color }}>{level}</span>;
+}
+
+const VOL_LABELS: Record<Quartile, string> = { 1: 'Lowest risk', 2: 'Below average', 3: 'Above average', 4: 'Highest risk' };
+const SHARPE_LABELS: Record<Quartile, string> = { 1: 'Top quarter', 2: 'Upper middle', 3: 'Lower middle', 4: 'Bottom quarter' };
+const QUARTILE_COLORS: Record<Quartile, string> = { 1: '#16a34a', 2: '#65a30d', 3: '#ea580c', 4: '#dc2626' };
+
+/** Quarter 1 is always the good end (calmest for volatility, best for Sharpe), so green = good in both columns. */
+function QuartileBadge({ q, labels }: { q?: Quartile; labels: Record<Quartile, string> }) {
+  if (!q) return <>—</>;
+  const color = QUARTILE_COLORS[q];
+  return <span className={styles.riskBadge} style={{ color, borderColor: color }}>{labels[q]}</span>;
 }
 
 // ── Column sets for each tab ────────────────────────────────────
@@ -98,7 +116,7 @@ const riskometerColumn: Column<Fund> = {
   key: 'riskometer', label: 'Riskometer', sortValue: f => f.riskometer, render: f => <RiskBadge level={f.riskometer} />,
 };
 
-function columnsFor(view: View): Column<Fund>[] {
+function columnsFor(view: View, rolling: { window: RollWindow; period: RollPeriod }): Column<Fund>[] {
   switch (view) {
     case 'snapshot':
       return [
@@ -117,6 +135,17 @@ function columnsFor(view: View): Column<Fund>[] {
         ret('3y', '3Y CAGR'), ret('5y', '5Y CAGR'), ret('10y', '10Y CAGR'),
         sip('1y', 'SIP 1Y'), sip('3y', 'SIP 3Y'), sip('5y', 'SIP 5Y'),
       ];
+    case 'rolling': {
+      const stat = (f: Fund) => f.rolling?.[rolling.window]?.[rolling.period];
+      return [
+        fundColumn,
+        { key: 'ravg', label: 'Average', numeric: true, title: 'Average return across all windows', sortValue: f => stat(f)?.avg, render: f => <Ret v={stat(f)?.avg} bold /> },
+        { key: 'rmed', label: 'Median', numeric: true, title: 'Middle value: half the windows did better, half worse', sortValue: f => stat(f)?.median, render: f => <Ret v={stat(f)?.median} /> },
+        { key: 'rmin', label: 'Worst', numeric: true, title: 'Lowest return in any window', sortValue: f => stat(f)?.min, render: f => <Ret v={stat(f)?.min} /> },
+        { key: 'rmax', label: 'Best', numeric: true, title: 'Highest return in any window', sortValue: f => stat(f)?.max, render: f => <Ret v={stat(f)?.max} /> },
+        { key: 'rpos', label: 'Times positive', numeric: true, title: 'Share of windows with a positive return', sortValue: f => stat(f)?.positivePct, render: f => (stat(f) ? `${stat(f)!.positivePct.toFixed(1)}%` : '—') },
+      ];
+    }
     case 'portfolio':
       return [
         fundColumn,
@@ -132,9 +161,17 @@ function columnsFor(view: View): Column<Fund>[] {
       return [
         fundColumn,
         riskometerColumn,
+        {
+          key: 'riskq', label: 'Risk vs category', title: 'Where this fund\'s volatility sits among funds in the same category (quarters)',
+          sortValue: f => f.risk?.volatilityQuartile, render: f => <QuartileBadge q={f.risk?.volatilityQuartile} labels={VOL_LABELS} />,
+        },
         { key: 'vol', label: 'Volatility (3Y)', numeric: true, title: 'Annualised standard deviation of daily NAV returns', sortValue: f => f.risk?.volatility, render: f => fixed(f.risk?.volatility, 2, '%') },
         { key: 'dd', label: 'Max drawdown (3Y)', numeric: true, title: 'Largest peak-to-trough fall in NAV', sortValue: f => f.risk?.maxDrawdown, render: f => <span style={{ color: retColor(f.risk?.maxDrawdown) }}>{fixed(f.risk?.maxDrawdown, 2, '%')}</span> },
-        { key: 'sharpe', label: 'Sharpe (3Y)', numeric: true, title: 'Excess return over a 6.5% risk-free rate, per unit of volatility', sortValue: f => f.risk?.sharpe, render: f => fixed(f.risk?.sharpe) },
+        { key: 'sharpe', label: 'Sharpe (3Y)', numeric: true, title: 'Excess return over the risk-free rate, per unit of volatility', sortValue: f => f.risk?.sharpe, render: f => fixed(f.risk?.sharpe) },
+        {
+          key: 'sharpeq', label: 'Return for risk', title: 'Where this fund\'s Sharpe ratio sits among funds in the same category (quarters)',
+          sortValue: f => f.risk?.sharpeQuartile, render: f => <QuartileBadge q={f.risk?.sharpeQuartile} labels={SHARPE_LABELS} />,
+        },
         { key: 'hi', label: '52W high (₹)', numeric: true, sortValue: f => f.risk?.high52, render: f => nav(f.risk?.high52) },
         { key: 'lo', label: '52W low (₹)', numeric: true, sortValue: f => f.risk?.low52, render: f => nav(f.risk?.low52) },
       ];
@@ -163,6 +200,7 @@ function columnsFor(view: View): Column<Fund>[] {
 const VIEWS: { id: View; label: string }[] = [
   { id: 'snapshot', label: 'Snapshot' },
   { id: 'returns', label: 'Returns' },
+  { id: 'rolling', label: 'Rolling' },
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'risk', label: 'Risk' },
   { id: 'details', label: 'Details' },
@@ -171,6 +209,7 @@ const VIEWS: { id: View; label: string }[] = [
 const DEFAULT_SORT: Record<View, { key: string; dir: 'asc' | 'desc' }> = {
   snapshot: { key: 'r1y', dir: 'desc' },
   returns: { key: 'r1y', dir: 'desc' },
+  rolling: { key: 'ravg', dir: 'desc' },
   portfolio: { key: 'aum', dir: 'desc' },
   risk: { key: 'sharpe', dir: 'desc' },
   details: { key: 'aum', dir: 'desc' },
@@ -179,8 +218,9 @@ const DEFAULT_SORT: Record<View, { key: string; dir: 'asc' | 'desc' }> = {
 const VIEW_NOTES: Record<View, string> = {
   snapshot: '1Y is the point-to-point absolute return; 3Y and 5Y are annualised (CAGR), measured from the latest NAV on or before the same date in the earlier year. “—” means the fund is younger than that period.',
   returns: 'Periods up to 1 year (1M, 3M, 6M, YTD, 1Y) are absolute returns; 3Y, 5Y and 10Y are CAGR. SIP columns show the annualised return (XIRR) of equal monthly instalments redeemed at the latest NAV.',
+  rolling: 'Rolling returns show how consistent a fund has been: take every possible start date, hold for the chosen window, and look at the spread of results. Windows longer than a year are annualised (CAGR). A fund needs history covering the look-back period plus the window, otherwise it shows “—”.',
   portfolio: 'Holdings and sector weights are not available from the free data sources used here. The mandate is the asset mix the scheme document permits; the benchmark is the index the fund is measured against.',
-  risk: 'Computed from daily NAVs over the last 3 years (funds with a shorter track record show “—”). Volatility is the annualised standard deviation of daily returns; max drawdown is the largest peak-to-trough fall; Sharpe uses a 6.5% risk-free rate. The riskometer is the SEBI-mandated label.',
+  risk: 'Computed from daily NAVs over the last 3 years (funds with a shorter track record show “—”). Volatility is the annualised standard deviation of daily returns; max drawdown is the largest peak-to-trough fall; Sharpe uses the risk-free rate shown below. “Risk vs category” and “Return for risk” rank each fund against the others in its category in quarters. The riskometer is the SEBI-mandated label.',
   details: 'Manager names and tenure, expense ratio (Regular plan), exit load and minimum investment come from scheme filings and may be out of date — check the scheme document before investing.',
 };
 
@@ -208,6 +248,8 @@ function FundsExplorer({ kind }: { kind: Kind }) {
   const [isLoading, setIsLoading] = useState(true);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [view, setView] = useState<View>('snapshot');
+  const [rollWindow, setRollWindow] = useState<RollWindow>('1y');
+  const [rollPeriod, setRollPeriod] = useState<RollPeriod>('5y');
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -222,7 +264,7 @@ function FundsExplorer({ kind }: { kind: Kind }) {
   }, [kind]);
 
   const category = report?.categories.find(c => c.id === categoryId);
-  const columns = useMemo(() => columnsFor(view), [view]);
+  const columns = useMemo(() => columnsFor(view, { window: rollWindow, period: rollPeriod }), [view, rollWindow, rollPeriod]);
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const funds = category?.funds ?? [];
@@ -275,6 +317,27 @@ function FundsExplorer({ kind }: { kind: Kind }) {
         </label>
       </div>
 
+      {view === 'rolling' && (
+        <div className={styles.rollingControls}>
+          <label>
+            Window
+            <select value={rollWindow} onChange={e => setRollWindow(e.target.value as RollWindow)} className={styles.select}>
+              <option value="1y">1 year</option>
+              <option value="3y">3 years</option>
+              <option value="5y">5 years</option>
+            </select>
+          </label>
+          <label>
+            Over the last
+            <select value={rollPeriod} onChange={e => setRollPeriod(e.target.value as RollPeriod)} className={styles.select}>
+              <option value="3y">3 years</option>
+              <option value="5y">5 years</option>
+            </select>
+          </label>
+          <span className={styles.metaNote}>Every {rollWindow.replace('y', '-year')} window that ended in the last {rollPeriod.replace('y', ' years')}</span>
+        </div>
+      )}
+
       {category && (
         <p className={styles.categoryLine}>
           {category.label} · {category.count} {noun} tracked · {kind === 'mf' ? 'Regular plan · Growth option' : 'NAV-based returns'} · click a column heading to sort
@@ -282,7 +345,7 @@ function FundsExplorer({ kind }: { kind: Kind }) {
       )}
 
       <DataTable
-        key={`${kind}-${categoryId}-${view}`}
+        key={`${kind}-${categoryId}-${view}-${rollWindow}-${rollPeriod}`}
         rows={rows}
         columns={columns}
         getKey={f => f.schemeCode}
@@ -295,6 +358,7 @@ function FundsExplorer({ kind }: { kind: Kind }) {
         <p>Source: {report.sources.join(' · ')}.</p>
         <p>
           {VIEW_NOTES[view]}
+          {view === 'risk' && report.riskFreeRatePct !== undefined ? ` Risk-free rate used: ${report.riskFreeRatePct}%.` : ''}
           {kind === 'etf' ? ' ETF figures are based on the fund’s NAV, not its exchange traded price, and ETFs whose units were split or consolidated show returns only where the NAV series is comparable.' : ''}
         </p>
         <p>Mutual fund investments are subject to market risks; read all scheme-related documents carefully. Past performance is not indicative of future returns.</p>

@@ -293,6 +293,7 @@ model Insight {
 model AppConfig {
   id          String   @id @default("default")
   activeGames String[] // Array of active game IDs
+  riskFreeRatePct Float? // risk-free rate (%) used for Sharpe ratios on the Indian market page
   updatedAt   DateTime @updatedAt
 }
 
@@ -307,6 +308,7 @@ model ApprovedClient {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
+  reports     ClientReport[]
 }
 
 model LoginOtp {
@@ -365,4 +367,21 @@ model ProductListing {
   updatedAt     DateTime @updatedAt
 
   @@index([category, isActive, sortOrder])
+}
+
+// ── Portfolio reports shown to a client after they sign in (Admin → Portfolio Reports) ──
+// The report is a self-contained HTML file exported from the analytics tool. It is served only to
+// the owning client (or an admin), inside a sandboxed frame.
+model ClientReport {
+  id          String         @id @default(uuid())
+  clientId    String
+  client      ApprovedClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  period      String?        // e.g. "October 2026"
+  html        String         @db.Text
+  isPublished Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([clientId, createdAt])
 }

@@ -23,6 +23,8 @@ import {
   UserCheck,
   HelpCircle,
   Package,
+  Briefcase,
+  FileBarChart,
   Menu,
   X,
   ArrowLeft
@@ -42,6 +44,7 @@ const aiFeatureItems = [
   { name: 'SIP Calculator', href: '/sip', icon: Target },
   { name: 'Tax Advisor', href: '/tax', icon: ShieldCheck },
   { name: 'Market News', href: '/news', icon: Newspaper },
+  { name: 'My Portfolio', href: '/my-portfolio', icon: Briefcase },
 ];
 
 const adminItems = [
@@ -54,6 +57,7 @@ const adminItems = [
   { name: 'FAQs', href: '/admin/faqs', icon: HelpCircle },
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Client Access', href: '/admin/clients', icon: UserCheck },
+  { name: 'Portfolio Reports', href: '/admin/portfolio-reports', icon: FileBarChart },
   { name: 'Games config', href: '/admin/games', icon: PlayCircle },
 ];
 

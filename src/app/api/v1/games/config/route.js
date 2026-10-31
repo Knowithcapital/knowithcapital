@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { DEFAULT_ACTIVE_GAMES } from '@/lib/games/defaults';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const config = await prisma.appConfig.findUnique({
-      where: { id: 'default' }
+      where: { id: 'default' },
+      select: { activeGames: true }
     });
     
     // If no config found in DB, return all chapters as default
     if (!config) {
-      return NextResponse.json({ 
-        activeGames: ['chapter1', 'chapter2', 'chapter3', 'chapter4', 'chapter5', 'chapter6', 'chapter7', 'chapter8', 'global-returns'] 
-      });
+      return NextResponse.json({ activeGames: DEFAULT_ACTIVE_GAMES });
     }
 
     return NextResponse.json({ activeGames: config.activeGames });

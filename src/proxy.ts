@@ -10,8 +10,8 @@ import { ADMIN_COOKIE, MEMBER_COOKIE, adminIpAllowed, clientIp, verifyAdminToken
 // Route handlers that mutate data also verify the session themselves.
 // ────────────────────────────────────────────────────────────────
 
-const MEMBER_PAGES = ['/advisor', '/health', '/news', '/portfolio', '/sip', '/support', '/tax'];
-const MEMBER_APIS = ['/api/v1/advisor', '/api/v1/health', '/api/v1/portfolio', '/api/v1/tax', '/api/v1/sip'];
+const MEMBER_PAGES = ['/advisor', '/health', '/news', '/portfolio', '/sip', '/support', '/tax', '/my-portfolio'];
+const MEMBER_APIS = ['/api/v1/advisor', '/api/v1/health', '/api/v1/portfolio', '/api/v1/tax', '/api/v1/sip', '/api/v1/me'];
 
 const under = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/');
 

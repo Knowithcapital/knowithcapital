@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { CheckCircle, Trash2, RefreshCw, Clock, Zap, AlertCircle } from 'lucide-react';
+import RiskFreeRateSetting from '@/components/RiskFreeRateSetting';
 const cn = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
 
 export default function MarketDataAdmin() {
@@ -96,6 +97,8 @@ export default function MarketDataAdmin() {
           </div>
         )}
       </div>
+
+      <RiskFreeRateSetting />
 
       {/* Report Table */}
       {isLoading ? (

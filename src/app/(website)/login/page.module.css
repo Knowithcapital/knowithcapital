@@ -263,6 +263,41 @@
   text-decoration: underline;
 }
 
+.destination {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.destination button {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--on-dark);
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.destination button + button {
+  border-left: 1px solid var(--border-dark);
+}
+
+.destination button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.destination .destActive {
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .signedIn {
   display: flex;
   flex-direction: column;

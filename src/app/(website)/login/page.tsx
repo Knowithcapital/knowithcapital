@@ -28,20 +28,9 @@ export default function LoginPage() {
             <h2>Existing client</h2>
             <p>View your portfolio, place transactions and download statements on your FundzBazar account.</p>
             <div className={styles.cardActions}>
-              <a href={SITE_LINKS.fundzbazarWeb} target="_blank" rel="noopener noreferrer" className={styles.btnPrimary}>
+              <a href={SITE_LINKS.fundzbazarLogin || SITE_LINKS.fundzbazarWeb} target="_blank" rel="noopener noreferrer" className={styles.btnPrimary}>
                 Client login on FundzBazar →
               </a>
-              <div className={styles.appRow}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={SITE_LINKS.fundzbazarAppQr} alt="QR code to download the FundzBazar app" width={84} height={84} className={styles.qr} />
-                <div>
-                  <div className={styles.appTitle}>On your phone?</div>
-                  <a href={SITE_LINKS.fundzbazarApp} target="_blank" rel="noopener noreferrer" className={styles.textLink}>
-                    Get the FundzBazar app →
-                  </a>
-                  <div className={styles.qrHint}>or scan the code</div>
-                </div>
-              </div>
               {SITE_LINKS.partnerLogin && (
                 <a href={SITE_LINKS.partnerLogin} target="_blank" rel="noopener noreferrer" className={styles.textLink}>
                   Registered through {SITE_LINKS.partnerName}? Sign in there →
@@ -58,14 +47,25 @@ export default function LoginPage() {
               <a href={SITE_LINKS.fundzbazarWeb} target="_blank" rel="noopener noreferrer" className={styles.btnPrimary}>
                 Open a free account →
               </a>
+              <div className={styles.appRow}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={SITE_LINKS.fundzbazarAppQr} alt="QR code to download the FundzBazar app" width={84} height={84} className={styles.qr} />
+                <div>
+                  <div className={styles.appTitle}>Prefer your phone?</div>
+                  <a href={SITE_LINKS.fundzbazarApp} target="_blank" rel="noopener noreferrer" className={styles.textLink}>
+                    Get the FundzBazar app →
+                  </a>
+                  <div className={styles.qrHint}>or scan the code to download the app and create your account</div>
+                </div>
+              </div>
               <Link href="/contact" className={styles.textLink}>Prefer to talk first? Book a consultation →</Link>
             </div>
           </section>
 
           <section className={`${styles.card} ${styles.cardFeature}`}>
             <div className={styles.cardNo}>03</div>
-            <h2>Research &amp; tools</h2>
-            <p>Registered investors can sign in with a one-time code sent to their email to use our AI planning tools and member research.</p>
+            <h2>Research, tools &amp; your portfolio</h2>
+            <p>Registered investors sign in with a one-time code sent to their email, then choose what to open: our AI planning tools and research, or your own portfolio report.</p>
             <Suspense fallback={null}>
               <OtpSignIn />
             </Suspense>
@@ -79,8 +79,22 @@ export default function LoginPage() {
 
 function OtpSignIn() {
   const router = useRouter();
-  const next = safeNext(useSearchParams().get('next'), '/advisor');
+  const nextParam = useSearchParams().get('next');
   const { loading, member } = useSession();
+  // Where to land after sign-in: research & tools by default, or the client's portfolio report
+  const [destination, setDestination] = useState<'tools' | 'portfolio'>('tools');
+  const next = safeNext(nextParam, destination === 'portfolio' ? '/my-portfolio' : '/advisor');
+
+  const destinationPicker = (
+    <div className={styles.destination} role="radiogroup" aria-label="What would you like to open?">
+      <button type="button" role="radio" aria-checked={destination === 'tools'} className={destination === 'tools' ? styles.destActive : ''} onClick={() => setDestination('tools')}>
+        Research &amp; tools
+      </button>
+      <button type="button" role="radio" aria-checked={destination === 'portfolio'} className={destination === 'portfolio' ? styles.destActive : ''} onClick={() => setDestination('portfolio')}>
+        Your portfolio
+      </button>
+    </div>
+  );
 
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
@@ -131,8 +145,9 @@ function OtpSignIn() {
     return (
       <div className={styles.signedIn}>
         <p>Signed in as <strong>{member.name || member.email}</strong>.</p>
+        {destinationPicker}
         <div className={styles.row}>
-          <Link href={next} className={styles.btnPrimary}>Open tools →</Link>
+          <Link href={next} className={styles.btnPrimary}>{destination === 'portfolio' ? 'Open my portfolio →' : 'Open tools →'}</Link>
           <button type="button" className={styles.btnGhost} onClick={async () => { await signOut('member'); router.refresh(); location.reload(); }}>
             Sign out
           </button>
@@ -143,6 +158,7 @@ function OtpSignIn() {
 
   return step === 'email' ? (
     <form onSubmit={requestCode} className={styles.form}>
+      {destinationPicker}
       <label htmlFor="otp-email">Email registered with us</label>
       <input id="otp-email" type="email" autoComplete="email" required value={email}
         onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className={styles.input} />

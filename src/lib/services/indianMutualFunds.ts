@@ -28,8 +28,8 @@ export const INDIAN_MF_CACHE_TAG = 'indian-mf-report';
 // Whole report must finish inside the route's 60s limit
 const BUILD_BUDGET_MS = 50000;
 
-// Risk-free rate used for the Sharpe ratio (approx. 91-day T-bill / repo-linked), in %
-const RISK_FREE_PCT = 6.5;
+// Default risk-free rate for the Sharpe ratio, in %. Admins can change it (AppConfig.riskFreeRatePct).
+export const DEFAULT_RISK_FREE_PCT = 6.5;
 const SIP_MONTHLY_AMOUNT = 10000;
 
 export type FundKind = 'mf' | 'etf';
@@ -46,6 +46,7 @@ export const FUND_CATEGORIES = [
   { id: 'multi-cap',      label: 'Multi Cap',         group: 'Equity', kind: 'mf',  match: /^multi cap fund$/i },
   { id: 'elss',           label: 'ELSS (Tax Saver)',  group: 'Equity', kind: 'mf',  match: /^elss/i },
   { id: 'aggressive-hybrid', label: 'Aggressive Hybrid', group: 'Hybrid', kind: 'mf', match: /^aggressive hybrid fund$/i },
+  { id: 'overseas-fof',   label: 'Overseas Funds',    group: 'International', kind: 'mf', match: /^(fof overseas|fund of funds investing overseas)$/i },
   { id: 'equity-etf',     label: 'Equity ETFs',       group: 'ETF',    kind: 'etf', match: /^equity etf$/i },
   { id: 'gold-etf',       label: 'Gold ETFs',         group: 'ETF',    kind: 'etf', match: /^gold etf$/i },
   { id: 'silver-etf',     label: 'Silver ETFs',       group: 'ETF',    kind: 'etf', match: /^silver etf$/i },
@@ -55,6 +56,17 @@ export const FUND_CATEGORIES = [
 
 export type ReturnKey = '1m' | '3m' | '6m' | 'ytd' | '1y' | '3y' | '5y' | '10y';
 export type SipKey = '1y' | '3y' | '5y';
+export type RollingWindow = '1y' | '3y' | '5y';
+export type RollingPeriod = '3y' | '5y';
+
+/** Spread of the returns you would have earned over every rolling window ending in the look-back period. */
+export interface RollingStats {
+  avg: number;
+  median: number;
+  min: number;
+  max: number;
+  positivePct: number;   // share of windows with a positive return
+}
 
 export interface FundPerformance {
   schemeCode: string;
@@ -63,10 +75,13 @@ export interface FundPerformance {
   nav: number;
   returns: Partial<Record<ReturnKey, number>>;       // percent, 2dp
   sip?: Partial<Record<SipKey, number>>;             // annualised SIP return (XIRR), percent
+  rolling?: Partial<Record<RollingWindow, Partial<Record<RollingPeriod, RollingStats>>>>;
   risk?: {
     volatility?: number;                              // annualised std-dev of daily returns, 3Y, percent
     maxDrawdown?: number;                             // worst peak-to-trough fall over 3Y, percent (negative)
-    sharpe?: number;                                  // 3Y, vs RISK_FREE_PCT
+    sharpe?: number;                                  // 3Y, vs the risk-free rate in the report
+    volatilityQuartile?: 1 | 2 | 3 | 4;              // 1 = least volatile quarter of its category, 4 = most
+    sharpeQuartile?: 1 | 2 | 3 | 4;                  // 1 = best risk-adjusted return quarter of its category
     high52?: number;                                  // 52-week NAV high
     low52?: number;                                   // 52-week NAV low
   };
@@ -93,6 +108,8 @@ export interface IndianFundReport {
     funds: FundPerformance[];   // every fund in the category, best 1Y return first
   }[];
   sources: string[];
+  /** Risk-free rate (%) used for the Sharpe ratios in this report. */
+  riskFreeRatePct: number;
   /** How the build went (counts only); lets a bad day be diagnosed from the API response. */
   diagnostics?: {
     schemes: number;
@@ -377,7 +394,40 @@ function consistentSeries(h: NavHistory): { series: NavHistory; validFrom: numbe
   return { series: { times: h.times.slice(cut), navs: h.navs.slice(cut) }, validFrom: h.times[cut] };
 }
 
-function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' | 'sip' | 'risk'> {
+const ROLLING_WINDOWS: { key: RollingWindow; years: number }[] = [{ key: '1y', years: 1 }, { key: '3y', years: 3 }, { key: '5y', years: 5 }];
+const ROLLING_PERIODS: { key: RollingPeriod; years: number }[] = [{ key: '3y', years: 3 }, { key: '5y', years: 5 }];
+
+/**
+ * Returns of every `windowYears` window that ends within the last `periodYears` (sampled about twice a week).
+ * Windows over one year are annualised (CAGR). Needs history reaching back period + window years.
+ */
+function rollingStats(h: NavHistory, windowYears: number, periodYears: number): RollingStats | undefined {
+  const last = h.times.length - 1;
+  const latest = new Date(h.times[last]);
+  const periodStart = yearsBefore(latest, periodYears).getTime();
+  if (h.times[0] > yearsBefore(new Date(periodStart), windowYears).getTime()) return undefined;
+
+  const vals: number[] = [];
+  const first = indexOnOrBefore(h.times, periodStart);
+  for (let i = Math.max(first, 0); i <= last; i += 3) {
+    const startIdx = indexOnOrBefore(h.times, yearsBefore(new Date(h.times[i]), windowYears).getTime());
+    if (startIdx < 0) continue;
+    const ratio = h.navs[i] / h.navs[startIdx];
+    vals.push((windowYears === 1 ? ratio - 1 : Math.pow(ratio, 1 / windowYears) - 1) * 100);
+  }
+  if (vals.length < 20) return undefined;
+  vals.sort((a, b) => a - b);
+  const mid = vals.length >> 1;
+  return {
+    avg: round2(vals.reduce((sum, v) => sum + v, 0) / vals.length),
+    median: round2(vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2),
+    min: round2(vals[0]),
+    max: round2(vals[vals.length - 1]),
+    positivePct: Math.round((vals.filter(v => v > 0).length / vals.length) * 1000) / 10,
+  };
+}
+
+function metricsFromHistory(full: NavHistory, riskFreePct: number): Pick<FundPerformance, 'returns' | 'sip' | 'risk' | 'rolling'> {
   const { series: h } = consistentSeries(full);
   const last = h.times.length - 1;
   const latest = new Date(h.times[last]);
@@ -426,7 +476,7 @@ function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' |
       risk.volatility = round2(vol);
       risk.maxDrawdown = round2(maxDd * 100);
       const cagr3 = (Math.pow(latestNav / h.navs[start], 1 / 3) - 1) * 100;
-      if (vol > 0) risk.sharpe = round2((cagr3 - RISK_FREE_PCT) / vol);
+      if (vol > 0) risk.sharpe = round2((cagr3 - riskFreePct) / vol);
     }
   }
   const from52 = indexOnOrBefore(h.times, latest.getTime() - 365 * DAY_MS);
@@ -434,7 +484,15 @@ function metricsFromHistory(full: NavHistory): Pick<FundPerformance, 'returns' |
   risk.high52 = Math.max(...recent);
   risk.low52 = Math.min(...recent);
 
-  return { returns, sip, risk };
+  const rolling: NonNullable<FundPerformance['rolling']> = {};
+  for (const w of ROLLING_WINDOWS) {
+    for (const per of ROLLING_PERIODS) {
+      const stats = rollingStats(h, w.years, per.years);
+      if (stats) (rolling[w.key] ??= {})[per.key] = stats;
+    }
+  }
+
+  return { returns, sip, risk, rolling: Object.keys(rolling).length ? rolling : undefined };
 }
 
 // ── Optional TigZig enrichment: AUM, riskometer, managers, fees ─
@@ -487,6 +545,30 @@ async function fetchSchemeDetails(codes: string[]): Promise<Map<string, SchemeDe
   return out;
 }
 
+/** Risk-free rate set by an admin (Admin → Market Data), falling back to the default. */
+async function loadRiskFreeRate(): Promise<number> {
+  try {
+    const { prisma } = await import('@/lib/prisma');
+    const cfg = await prisma.appConfig.findUnique({ where: { id: 'default' }, select: { riskFreeRatePct: true } });
+    const v = cfg?.riskFreeRatePct;
+    if (typeof v === 'number' && v >= 0 && v <= 25) return v;
+  } catch (err) {
+    console.warn('[IndianMF] Using the default risk-free rate:', (err as Error).message);
+  }
+  return DEFAULT_RISK_FREE_PCT;
+}
+
+/** Ranks the funds in one category into quarters: volatility (1 = calmest) and Sharpe (1 = best). Needs 4+ funds. */
+function assignRiskQuartiles(funds: FundPerformance[]) {
+  const quartile = (rank: number, n: number) => (Math.min(4, Math.floor((rank / n) * 4) + 1)) as 1 | 2 | 3 | 4;
+
+  const withVol = funds.filter(f => f.risk?.volatility !== undefined).sort((a, b) => a.risk!.volatility! - b.risk!.volatility!);
+  if (withVol.length >= 4) withVol.forEach((f, i) => { f.risk!.volatilityQuartile = quartile(i, withVol.length); });
+
+  const withSharpe = funds.filter(f => f.risk?.sharpe !== undefined).sort((a, b) => b.risk!.sharpe! - a.risk!.sharpe!);
+  if (withSharpe.length >= 4) withSharpe.forEach((f, i) => { f.risk!.sharpeQuartile = quartile(i, withSharpe.length); });
+}
+
 // ── Main ────────────────────────────────────────────────────────
 
 export async function generateIndianFundReport(): Promise<IndianFundReport> {
@@ -500,6 +582,8 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
   const live = rows.filter(r => r.navDate.getTime() >= staleCutoff);
   const codes = live.map(r => r.code);
 
+  const riskFreePct = await loadRiskFreeRate();
+
   // History (returns, SIP, risk) and scheme details load concurrently inside one time budget
   const since = new Date(yearsBefore(latest, 10).getTime() - 10 * DAY_MS).toISOString().slice(0, 10);
   const deadline = startedAt + BUILD_BUDGET_MS;
@@ -511,7 +595,7 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
 
   const funds = live.map((r): { categoryId: string; fund: FundPerformance } => {
     const hist = histories.get(r.code);
-    const extra = hist ? metricsFromHistory(hist) : undefined;
+    const extra = hist ? metricsFromHistory(hist, riskFreePct) : undefined;
     const det = details.get(r.code);
     return {
       categoryId: r.categoryId,
@@ -525,6 +609,7 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
         returns: extra?.returns ?? {},
         sip: extra?.sip && Object.keys(extra.sip).length ? extra.sip : undefined,
         risk: extra?.risk,
+        rolling: extra?.rolling,
       },
     };
   });
@@ -537,6 +622,8 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
     return { id: cat.id, label: cat.label, group: cat.group, kind: cat.kind, count: inCat.length, funds: inCat };
   }).filter(c => c.count > 0);
 
+  for (const c of categories) assignRiskQuartiles(c.funds);
+
   return {
     navDate: latest.toISOString().slice(0, 10),
     generatedAt: new Date().toISOString(),
@@ -546,6 +633,7 @@ export async function generateIndianFundReport(): Promise<IndianFundReport> {
       'NAV history, returns, SIP & risk measures: AMFI NAV records via TigZig MF API (api.tigzig.com)',
       'AUM, riskometer, fund managers & fees: AMFI / SEBI filings via TigZig MF API',
     ],
+    riskFreeRatePct: riskFreePct,
     diagnostics: {
       schemes: codes.length,
       historyFromTigzig: stats.tigzig,
