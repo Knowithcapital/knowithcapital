@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import TestimonialCarousel from '@/components/TestimonialCarousel';
 import HeroFaq from '@/components/HeroFaq';
 import ContactForm from '@/components/ContactForm';
+import LatestInsights from '@/components/LatestInsights';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
@@ -258,37 +259,8 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* 7. Insights */}
-      <section className="section-light-2">
-        <motion.div 
-          className="container"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-        >
-          <motion.div variants={fadeInUp} className="eyebrow">Market Intelligence</motion.div>
-          <motion.h2 variants={fadeInUp}>Insights & Perspectives</motion.h2>
-          <br /><br />
-          <div className={`hairline-grid hairline-grid-light ${styles.insightsGrid}`}>
-            {[
-              { tag: 'Market Update', title: 'Navigating Volatility in Q3', desc: 'How structured asset allocation protects against downside risk.' },
-              { tag: 'Taxation', title: 'New LTCG Rules Explained', desc: 'Adjusting your portfolio for optimal tax harvesting.' },
-              { tag: 'Retirement', title: 'The 4% Rule in India', desc: 'Why standard withdrawal rates need adjustment for domestic inflation.' }
-            ].map((article, i) => (
-              <motion.div variants={fadeInUp} key={i} className={`hairline-cell-light ${styles.insightCard}`}>
-                <div className={styles.insightMedia}></div>
-                <div className={styles.insightContent}>
-                  <div className="eyebrow" style={{marginBottom: 0}}>{article.tag}</div>
-                  <h3>{article.title}</h3>
-                  <p>{article.desc}</p>
-                  <Link href="/insights" className={styles.serviceLink}>Read the note &rarr;</Link>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </section>
+      {/* 7. Insights — the newest published insights, hidden until there is one */}
+      <LatestInsights />
 
       {/* 10. Contact (Dark) */}
       <section className="section-dark">

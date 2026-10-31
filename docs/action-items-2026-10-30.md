@@ -72,8 +72,8 @@ Source: Gemini notes and the full transcript of the 30 Oct 2026 call (Abhinav Me
 
 - [x] **Remove the hardcoded "guided by experience" text** from the homepage. — Us **Done:** the whole Leadership section (including the "Placeholder Name" cards) is removed.
 - [x] **Keep that section minimal** (possibly just Abhinav's name); no separate team-profile page. — Us **Done** (section removed; add a name later if Abhinav wants one).
-- [ ] **Confirm new Insights articles appear automatically on the homepage** (Priyank confirmed they do; verify with a test article). — Us
-- [ ] **Write documentation** for market insights, how the quiz works, and how to use the admin panel, so Abhinav can self-serve when the team is unavailable. — Us
+- [x] **Confirm new Insights articles appear automatically on the homepage.** On checking, the homepage section was three hardcoded sample cards, so the promise was not true. It now shows the three newest published insights and hides itself when there are none. (Code done, needs deploy.) — Us
+- [x] **Write documentation** for market insights, how the quiz works, and how to use the admin panel, so Abhinav can self-serve when the team is unavailable. — Us. **Done:** a nine-part guide in [client-guide](client-guide/README.md) covering every page, where the data comes from and is stored, the logic, and the admin panel.
 - [ ] **Add the photo story to Our Story** (historical photos with fund managers and personal milestones), once the photos arrive. — Us
 
 ### Legal text
@@ -91,6 +91,8 @@ Source: Gemini notes and the full transcript of the 30 Oct 2026 call (Abhinav Me
 - [x] **The homepage contact form only showed a "demo" popup and sent nothing.** It now uses the same working form as the Contact page, so enquiries from the homepage reach the inbox. (Code done, needs deploy.)
 - [x] **Navbar logo no longer squeezes against the menu on mid-size screens;** the menu collapses to the hamburger below 1100px. (Code done, needs deploy.)
 - [x] **Removed stale copies of the old insecure endpoints from the working folder** (public seed/login routes and the open grok proxy). They were untracked, identical to the version an earlier commit removed on purpose, and they broke local development.
+
+- [x] **Removed the "Narrative & Numbers" card from Calculators.** It linked to a page that does not exist (404). Bring it back only if Abhinav wants a business-valuation tool built.
 
 ### Launch
 
