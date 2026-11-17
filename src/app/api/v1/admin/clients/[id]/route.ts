@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth/guards';
+import { deletePrivate } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,9 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const denied = await requireAdmin();
   if (denied) return denied;
   const { id } = await ctx.params;
+  // Their portfolio report row goes with them; remove the PDF from storage too
+  const report = await prisma.portfolioReport.findUnique({ where: { clientId: id }, select: { fileKey: true } }).catch(() => null);
   await prisma.approvedClient.deleteMany({ where: { id } });
+  if (report) await deletePrivate(report.fileKey);
   return NextResponse.json({ success: true });
 }

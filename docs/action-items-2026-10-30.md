@@ -46,15 +46,27 @@ Source: Gemini notes and the full transcript of the 30 Oct 2026 call (Abhinav Me
 - [ ] **Check the QR code on iPhone.** It opens the Play Store on Android; the App Store was not verified. — Us
 - [x] **Add a "Portfolio data" option** next to "Research & tools" on the login page (OTP sign-in, no password). — Us **Done:** "Your portfolio" choice next to "Research & tools" on the login card; signs in with the email code and opens the portfolio page.
 
-### Client portfolio reports (new feature)
+### Client portfolio reports (changed on 18 Nov: now one PDF per client)
 
-- [x] **Admin upload of per-client reports** (HTML or Excel exported from Abhinav's analytics tool), linked to the client's email. — Us **Done:** Admin → Portfolio Reports (code done, needs deploy and the new table).
-- [x] **Client view after OTP login:** a logged-in client sees their own report. — Us **Done:** Sidebar → My Portfolio, shown in a sandboxed frame; a client can only open their own report.
-- [ ] **Agree a universal report layout** and have the backend format uploaded reports into it; remove information Abhinav does not want shown. — Us
-- [x] **Support bulk upload** (several clients' reports at once). Abhinav said bulk upload is not possible on his side; Priyank said we can support it. — Us **Done:** choose several HTML files at once; the client is pre-filled from the file name when it matches.
-- [ ] **Optional automatic email** of the report to each client. — Us / Abhinav to decide
-- [ ] **Merge the interactive HTML chart** (live values when you move the cursor) into the final report, after the universal layout is set. — Us
-- [ ] **Draft a final report** from Abhinav's two HTML files and his requirements, and bring it to the next meeting for review. — Us
+Abhinav's analytics reports are now delivered as **PDFs** (sample: the 91-page, 15 MB "Investment Snapshot" family report), uploaded per client from the admin panel, stored in a **private Cloudflare R2 bucket**, replaced each month, and downloadable by the client.
+
+- [x] **Upload a PDF per client in the admin panel.** Admin → Portfolio Reports: choose PDF(s), pick the client, check the "as on" date; the client and date are pre-filled from the file name (code done, needs deploy and R2). — Us
+- [x] **One report per client; a new upload automatically deletes the previous file** from storage. — Us (code done)
+- [x] **Client sees a My Portfolio tab after signing in** (login → "Your portfolio", or the side menu): read the PDF on the page, open it in a new tab, or download it. — Us (code done)
+- [x] **Private storage:** the PDF sits in a private bucket and is opened only through a one-minute signed link after the site checks the signed-in client. Removing a client deletes their PDF. — Us (code done)
+- [x] **Large files:** the browser uploads straight to R2 so files of tens of MB work (limit 60 MB). — Us (code done)
+- [x] **Support bulk upload:** several PDFs at once. — Us (code done)
+- [ ] **Set up Cloudflare R2 and connect it** (two buckets, an access key, CORS, six environment variables). Step-by-step in [storage-setup-r2.md](storage-setup-r2.md). Until this is done, uploads are switched off on the live site. — Us
+- [ ] **Test the full flow after R2 is connected** with the sample PDF and a real client email: upload, sign in, view, download, then upload a second PDF and confirm the first disappears from the bucket. — Us
+- [ ] **Decide the monthly routine:** who uploads, and by which day each month. Optionally email clients when a new report is uploaded. — Abhinav / Us
+- [x] ~~Admin upload of HTML reports with an on-page viewer~~ — replaced by the PDF flow above (the earlier HTML version was removed before it was used).
+- [ ] **Universal report layout:** no longer needed if reports are always the PDF Abhinav exports. Confirm with him whether the interactive-HTML idea is dropped or comes back later. — Abhinav
+- [ ] **Merge the interactive HTML chart into the final report:** parked until Abhinav confirms whether the PDF replaces it. — Us
+
+### File storage: move to Cloudflare R2
+
+- [x] **Insights uploads (PDFs, covers, charts) now use R2** when it is configured; older files saved on Vercel Blob keep working. (Code done, needs R2 set up.) — Us
+- [ ] **Connect R2** as above and re-test an insight PDF upload and conversion. — Us
 
 ### Custom investor performance chart
 
@@ -142,6 +154,5 @@ Source: Gemini notes and the full transcript of the 30 Oct 2026 call (Abhinav Me
 
 - [ ] **Push the drawdown/NAV-history fix** (`f2971d1`) and the new work. Two schema changes are additive and are created by the build's `prisma db push`: the `ClientReport` table and a new `riskFreeRatePct` column on `AppConfig`.
 - [ ] **After deploying, open Admin → Market Data** and check the risk-free rate card loads, then **Admin → Portfolio Reports** and **Admin → FAQs / Products**.
-- [ ] **Test the portfolio flow end to end** with a real client email from the imported list: upload a sample HTML report, sign in with the email code on the login page, choose "Your portfolio".
-- [ ] **Check that an HTML report with interactive charts renders** inside the sandboxed frame (scripts run but cannot touch the site). Reports that load charts from the internet will need that internet access.
-- [ ] **Reports are limited to 4 MB each.** If Abhinav's HTML files are larger (for example with embedded chart libraries), tell us.
+- [ ] **Test the portfolio flow end to end** (see the portfolio section above): needs R2 connected first.
+- [ ] **Database change:** this build replaces the earlier `ClientReport` table with a new `PortfolioReport` table. The earlier table was never used for real data, and the build's `prisma db push` drops it.

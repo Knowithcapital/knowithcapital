@@ -308,7 +308,7 @@ model ApprovedClient {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
-  reports     ClientReport[]
+  portfolioReport PortfolioReport?
 }
 
 model LoginOtp {
@@ -369,19 +369,17 @@ model ProductListing {
   @@index([category, isActive, sortOrder])
 }
 
-// ── Portfolio reports shown to a client after they sign in (Admin → Portfolio Reports) ──
-// The report is a self-contained HTML file exported from the analytics tool. It is served only to
-// the owning client (or an admin), inside a sandboxed frame.
-model ClientReport {
-  id          String         @id @default(uuid())
-  clientId    String
-  client      ApprovedClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  title       String
-  period      String?        // e.g. "October 2026"
-  html        String         @db.Text
-  isPublished Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  @@index([clientId, createdAt])
+// ── Client portfolio report (Admin → Portfolio Reports) ──
+// One PDF per client, kept in the private storage bucket. Uploading a new one replaces
+// (and deletes) the previous file. The client downloads it from "My Portfolio" after signing in.
+model PortfolioReport {
+  id         String         @id @default(uuid())
+  clientId   String         @unique
+  client     ApprovedClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fileKey    String         // object key in the private bucket, e.g. portfolio/<uuid>.pdf
+  fileName   String
+  fileSize   Int
+  reportDate DateTime?      @db.Date // the "as on" date of the report
+  uploadedAt DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }

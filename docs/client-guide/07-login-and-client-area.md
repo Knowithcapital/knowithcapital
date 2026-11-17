@@ -44,20 +44,19 @@ Covers the **Login** page (`/login`), the **research tools** and **Your portfoli
 - The tools are AI-assisted guidance, not advice. Each report carries a disclaimer.
 - The **Tax Advisor currently uses the 2024-25 tax slabs**. These need updating to the current year before the tool is promoted. Please tell us whether to pause it until then.
 
-## Your portfolio (client's own report)
+## Your portfolio (the client's monthly report)
 
-**What the client sees:** after signing in and choosing **Your portfolio**, their own latest portfolio report, in a framed page. If you have uploaded several periods, they can switch between them. If there is nothing yet, a friendly "not ready yet" message.
+**What the client sees:** after signing in and choosing **Your portfolio**, a **My Portfolio** page opens in the side menu. It shows their latest monthly portfolio report as a PDF: they can read it on the page, open it in a new tab, or **download** it whenever they want. The page shows the "as on" date, the file name and size. If there is nothing yet, a friendly "not ready yet" message.
 
 **How it works**
-1. You create the report in your analytics tool and export it as an **HTML file**.
-2. In **Admin → Portfolio Reports** you upload it against the client's email. You can choose many files at once; if a file name contains the client's email or name, the client is pre-selected. Uploading again for the same client and period replaces the earlier file.
-3. When that client signs in, they see their report. Nobody else can open it.
+1. You prepare the monthly report as a **PDF** (for example the "Investment Snapshot" report).
+2. In **Admin → Portfolio Reports** you upload it for the client. You can choose many PDFs at once; the client and the "as on" date are filled in from the file name when it contains them, and you can correct them.
+3. Each client has **one** report. **When you upload a new one, the previous one is replaced and its file is deleted automatically.** Only the latest is ever kept.
+4. When that client signs in, they see their report. Nobody else can open it.
 
-**Where it is stored:** the report file is kept in the website database against that client. Hidden reports stay stored but clients cannot see them.
-
-**Safety design:** the report runs inside a protected frame. Its charts and hover values work, but the report cannot read the website, the client's session or anything else.
+**Where it is stored:** the PDF is kept in a **private storage bucket** (Cloudflare R2) that has no public address. The website database keeps only a small record: which client, the file name and size, the "as on" date and when it was uploaded. A client's PDF is opened through a link that **expires after one minute** and is only created after the website has checked who is asking.
 
 **Limits**
-- Each file can be up to **4 MB**.
-- Interactive pieces that load code from the internet need the client to be online.
-- A common look for all reports (the "universal format") is still to be agreed once you share your two HTML files.
+- Each PDF can be up to **60 MB** (large family reports of 15 MB and more are fine).
+- If a client is suspended or removed in Client Access, they lose access immediately. Removing a client also deletes their PDF.
+- Phones sometimes cannot show a PDF inside a page, so the page always offers **Open in new tab** and **Download PDF** buttons.

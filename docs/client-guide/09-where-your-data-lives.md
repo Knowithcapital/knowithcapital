@@ -15,7 +15,7 @@ This page lists **every kind of information the website keeps**, where it is kep
 |---|---|---|
 | **Approved client list:** name, email, active or suspended, last sign-in | Private website database | You (Admin → Client Access) |
 | **Sign-in codes** | Database, in scrambled form only, expiring after 10 minutes | Nobody can read a code back |
-| **Client portfolio reports** you upload | Private website database, against the client | You, and only the client the report belongs to |
+| **Client portfolio reports** (the monthly PDF you upload) | **A private storage bucket (Cloudflare R2) with no public address.** The database holds only the file name, date and which client it belongs to | You, and only the client it belongs to. Links to open it expire after one minute |
 | **Research-tool conversations** (messages, details the client typed, the generated report, AI usage) | Private website database | You (Admin → Chat Logs) |
 | **Chat assistant conversations and leads** (visitors may type name, email, phone, city, investment range) | Private website database | You (Admin → Chat Logs and Leads) |
 | **Contact-form enquiries** | **Not** in the database. They are emailed through Web3Forms to the receiving mailbox | Whoever reads that mailbox |
@@ -23,7 +23,7 @@ This page lists **every kind of information the website keeps**, where it is kep
 | **Quiz leaderboard** (a name the player types and a score) | Website database | Public on the leaderboard (top ten) |
 | **Quiz progress during a visit** | The visitor's own browser, until the tab closes | The visitor only |
 | **FAQs, Products, Insights text, Global Markets report** | Website database | Public once published |
-| **Insight PDFs, cover pictures, extracted charts** | The website's file storage | Public once published (drafts are not linked) |
+| **Insight PDFs, cover pictures, extracted charts** | The public storage bucket (Cloudflare R2) | Public once published (drafts are not linked) |
 | **Calculator inputs and results** | Not stored anywhere | Nobody |
 | **Indian fund and ETF tables** | Not in the database; built from public sources and kept in a temporary cache for up to a day | Public |
 | **Admin passwords** | Database, in scrambled (hashed) form | Nobody can read them back |
@@ -32,7 +32,8 @@ This page lists **every kind of information the website keeps**, where it is kep
 
 | Service | Used for | What it receives |
 |---|---|---|
-| **Vercel** | Hosts the website, file storage for uploads and the daily scheduled jobs | Everything the website serves; uploaded files |
+| **Vercel** | Hosts the website and runs the daily scheduled jobs | Everything the website serves |
+| **Cloudflare R2** | File storage: a public bucket for insight files and a private bucket for client portfolio PDFs | The uploaded files |
 | **Neon** | The private database | All stored information above |
 | **Google Gemini (AI)** | Chat assistant, research tools, PDF-to-article, Narrative Planner, estimates in Global Markets | The text a person types into those tools, and the pages of PDFs you upload for Insights. It does **not** receive the client list |
 | **Resend** | Emails: sign-in codes and campaigns | The recipient's email and the message |
@@ -45,7 +46,7 @@ This page lists **every kind of information the website keeps**, where it is kep
 
 - **Admin panel:** email and password, sessions expire after about 8 hours, repeated wrong passwords lock the sign-in, and the panel can be limited to chosen office networks if you want.
 - **Clients:** an emailed one-time code, valid for 10 minutes and once only; limited requests; lock-out after repeated wrong codes; suspending a client takes effect immediately.
-- **Client reports:** served only to the client they belong to (or an admin), inside a protected frame so a report cannot read anything else on the site.
+- **Client reports:** stored in a private bucket, served only to the client they belong to (or an admin) through a link that lasts one minute. A new monthly upload deletes the previous file.
 - **Passwords and sign-in cookies** are stored in secured, tamper-proof form.
 - All traffic uses secure (HTTPS) connections.
 
@@ -54,7 +55,7 @@ This page lists **every kind of information the website keeps**, where it is kep
 - **The developers can technically reach the database** (with their secured accounts) to run the website. If you want a stricter arrangement, such as access only when you approve it, tell us and we can agree a written process.
 - **The AI services process what people type** into the chat and research tools. Do not ask clients to type PAN, account or bank numbers into them.
 - **Contact-form enquiries pass through Web3Forms**, an outside service, before reaching your mailbox.
-- **Removing a client** deletes their portfolio reports and sign-in record. Past chat logs may keep the email they signed in with, so you can still read old conversations. Tell us if you want those deleted too.
+- **Removing a client** deletes their portfolio PDF and sign-in record. Past chat logs may keep the email they signed in with, so you can still read old conversations. Tell us if you want those deleted too.
 - A **privacy notice for this website** is still to be written (see guide 01, "Legal text"). It should list the points on this page.
 
 ## Suggested wording for your clients

@@ -52,7 +52,11 @@ The list of people allowed to sign in to the research tools and see their portfo
 - The sheet you sent has 530 rows but about 393 different emails, because some emails repeat. Tell us if family members who share an email should be handled differently.
 
 ### Portfolio Reports
-Upload each client's HTML report and control who sees it. Details in [guide 07](07-login-and-client-area.md).
+Upload each client's **monthly portfolio report as a PDF**. The client then sees it under **My Portfolio** and can download it. Details in [guide 07](07-login-and-client-area.md).
+- Click **Choose PDF report(s)**, pick the client (type a name or email to search), check the **"as on" date**, and press **Upload**. You can add many at once.
+- A client has **one** report. Uploading a new one **replaces and deletes** the previous one automatically.
+- The table lists each client's current report with buttons to **open**, **download** or **delete** it.
+- The page shows a notice if private file storage has not been connected yet.
 
 ### Games config
 Switch each Quiz chapter on or off.
