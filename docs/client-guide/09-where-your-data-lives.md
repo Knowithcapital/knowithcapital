@@ -23,6 +23,7 @@ This page lists **every kind of information the website keeps**, where it is kep
 | **Quiz leaderboard** (a name the player types and a score) | Website database | Public on the leaderboard (top ten) |
 | **Quiz progress during a visit** | The visitor's own browser, until the tab closes | The visitor only |
 | **FAQs, Products, Insights text, Global Markets report** | Website database | Public once published |
+| **Quarterly Results Tracker** (results, deals, monthly numbers, news, X posts) | Website database (one record plus an update log) | Public on the Insights page; updates by admins only |
 | **Insight PDFs, cover pictures, extracted charts** | Public file storage (Cloudinary) | Public once published (drafts are not linked) |
 | **Calculator inputs and results** | Not stored anywhere | Nobody |
 | **Indian fund and ETF tables** | Not in the database; built from public sources and kept in a temporary cache for up to a day | Public |

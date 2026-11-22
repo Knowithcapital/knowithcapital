@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quarterly Results Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F3EC;--panel:#fff;--fg:#0B2E33;--muted:#566968;--line:#E2DCCD;
+  --blue:#8A6422;--blue-soft:#F3EAD6;--up:#137a43;--up-soft:#e6f4ec;--down:#b42318;--down-soft:#fdecea;
+  --amber:#9a5b00;--amber-soft:#fff3db;--violet:#5b3fb5;--violet-soft:#efeafc;--wa:#128c4a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+a{color:var(--blue)}
+.wrap{max-width:980px;margin:0 auto;padding:16px 14px 80px}
+header h1{font:600 24px/1.2 "Source Serif 4",Georgia,serif;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px}
+.sub b{color:var(--fg);font-weight:600}
+.tabs{display:flex;gap:6px;margin:16px 0 12px;overflow-x:auto;scrollbar-width:none;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+.tabs a{flex:0 0 auto;text-decoration:none;color:var(--muted);padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:500;font-size:14px}
+.tabs a.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tabs .n{opacity:.7;font-weight:400;margin-left:4px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+input[type=search],select{font:inherit;font-size:14px;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+input[type=search]{flex:1 1 220px;min-width:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{font:inherit;font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font:600 24px/1.2 "Source Serif 4",Georgia,serif;margin-top:2px}
+.list{display:grid;gap:8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+.row1{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.name{font-weight:600;font-size:16px;cursor:pointer;color:var(--fg);text-decoration:none;background:none;border:0;padding:0;font-family:inherit;text-align:left}
+.name:hover{text-decoration:underline}
+.meta{color:var(--muted);font-size:12.5px}
+.nums{display:flex;gap:18px;margin:8px 0 6px;flex-wrap:wrap}
+.num .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.num .x{font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
+.pos{color:var(--up)}.neg{color:var(--down)}.na{color:var(--muted)}
+.tag{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.t-turn{background:var(--violet-soft);color:var(--violet)}
+.t-strong{background:var(--up-soft);color:var(--up)}
+.t-lever{background:var(--blue-soft);color:var(--blue)}
+.t-steady{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.t-down{background:var(--down-soft);color:var(--down)}
+.t-loss{background:var(--amber-soft);color:var(--amber)}
+.note{font-size:13px;color:var(--muted);margin:2px 0 6px}
+.xpost{white-space:pre-line;font-size:13.5px;line-height:1.45;border-left:3px solid var(--violet);padding:2px 0 2px 10px;margin:6px 0}
+.xlabel{font-size:11.5px;color:var(--violet);font-weight:600}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:6px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.wa{background:var(--wa);border-color:var(--wa);color:#fff}
+.src{font-size:12px;color:var(--muted);margin-left:auto}
+.src a{color:var(--muted)}
+.empty{color:var(--muted);padding:24px 4px;text-align:center}
+.legend{font-size:12.5px;color:var(--muted);margin:-4px 0 12px;line-height:1.7}
+.legend .tag{margin-right:4px}
+.foot{margin-top:28px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.view{display:none}.view.on{display:block}
+.dc{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--amber-soft);color:var(--amber);white-space:nowrap}
+.dcok{font-size:11px;color:var(--up);white-space:nowrap}
+table.sec{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table.sec th,table.sec td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.sec th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none;background:var(--bg)}
+table.sec th:first-child,table.sec td:first-child{text-align:left;white-space:normal}
+table.sec tr.tot td{font-weight:600;background:var(--bg)}
+.tblwrap{overflow-x:auto;margin-bottom:12px;border-radius:12px}
+.narr{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.narr p{margin:0 0 6px}.narr p:last-child{margin:0}
+.qsel{margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30}
+.toast.show{opacity:1}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:20;align-items:flex-end;justify-content:center}
+.sheet.on{display:flex}
+.sheet .box{background:var(--panel);width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 28px}
+.sheet h2{font:600 20px/1.2 "Source Serif 4",Georgia,serif;margin:0 0 4px}
+.sheet h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:16px 0 6px}
+.sheet .close{float:right}
+.mini{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.how{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.how ol{margin:6px 0 0 18px;padding:0}
+@media (min-width:720px){.list.two{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Quarterly Results Tracker</h1>
+  <div class="sub" id="sub"></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <a href="#results" data-v="results">Results<span class="n" id="n-results"></span></a>
+  <a href="#deals" data-v="deals">Deals<span class="n" id="n-deals"></span></a>
+  <a href="#monthly" data-v="monthly">Monthly data<span class="n" id="n-monthly"></span></a>
+  <a href="#news" data-v="news">News &amp; X<span class="n" id="n-news"></span></a>
+  <a href="#sectors" data-v="sectors">Sectors</a>
+</nav>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search company or sector…" autocomplete="off">
+</div>
+
+<section class="view" id="v-results">
+  <div class="tiles" id="tiles"></div>
+  <div class="controls">
+    <select id="sector"><option value="">All sectors</option></select>
+    <select id="sort">
+      <option value="date">Newest first</option>
+      <option value="pat">Profit growth, high → low</option>
+      <option value="rev">Revenue growth, high → low</option>
+      <option value="name">Name A–Z</option>
+    </select>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="legend">
+    <span class="tag t-turn">Turnaround</span>back to profit &nbsp;·&nbsp;
+    <span class="tag t-strong">Strong growth</span>revenue ≥15% and profit ≥20% YoY &nbsp;·&nbsp;
+    <span class="tag t-lever">Profit-led</span>profit ≥20%, at least 20 pts ahead of revenue &nbsp;·&nbsp;
+    <span class="tag t-down">Profit down</span>fell or swung to loss. Tags are mechanical labels on reported numbers, for internal screening only, and are never included in WhatsApp cards.
+  </div>
+  <div class="list two" id="list-results"></div>
+</section>
+
+<section class="view" id="v-deals">
+  <div class="chips" id="chips-deals"></div>
+  <div class="list two" id="list-deals"></div>
+</section>
+
+<section class="view" id="v-monthly">
+  <div class="list two" id="list-monthly"></div>
+</section>
+
+<section class="view" id="v-news">
+  <div class="how" id="xhow">
+    <b>Third-party views from X</b> (@nid_rockz, @AlfafinderIndia) are read automatically on each refresh and shown in the author's own words with a link to the original post. They are the author's views, not this tracker's.
+  </div>
+  <div class="list" id="list-news"></div>
+</section>
+
+<section class="view" id="v-sectors">
+  <div class="controls qsel"><select id="qsel"></select></div>
+  <div class="tiles" id="sec-tiles"></div>
+  <div class="narr" id="sec-narr"></div>
+  <div class="tblwrap"><table class="sec" id="sec-table"></table></div>
+  <div class="legend" id="sec-legend">Counts and medians, in the style of a results scorecard, over results verified with the company's consolidated filing on NSE (Source: NSE). Unverified results are not included. <b>Profit grew</b>: companies whose net profit rose year on year, out of those with a profit a year earlier. Medians show the typical company. Tap a column to sort, a sector to see its companies. Each season is stored and kept for comparison with the next.</div>
+  <div class="actsrow" id="sec-share"></div>
+</section>
+
+<div class="foot" id="foot"></div>
+</div>
+
+<div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = /*__DATA__*/;
+const DISCLAIMER = "For information only, based on company filings and public data; not a recommendation to buy or sell any security.\n— Abhinav Mehta, AMFI registered Mutual Fund & SIF Distributor (ARN 46498)";
+
+const $ = s => document.querySelector(s);
+const safeUrl = u => (/^https?:\/\//i.test(u || "") ? u : "#");
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const fmtDate = d => { if(!d) return ""; const t = new Date(d + (d.length===10?"T00:00:00":"")); return isNaN(t)? d : t.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}); };
+const pct = v => v==null ? "—" : (v>0?"+":"") + (Math.abs(v)>=1000 ? Math.round(v).toLocaleString("en-IN") : v.toFixed(1)) + "%";
+const cls = v => v==null ? "na" : v>0 ? "pos" : v<0 ? "neg" : "na";
+const inr = v => "₹" + Number(v).toLocaleString("en-IN",{maximumFractionDigits:2}) + " cr";
+const units = v => Number(v).toLocaleString("en-IN");
+
+function tagOf(r){
+  const s = r.pat_status, rv = r.rev_yoy, pv = r.pat_yoy;
+  if (s === "Back to profit") return ["turn","Turnaround"];
+  if (s === "Fell" || s === "Swung to loss") return ["down","Profit down"];
+  if (s === "Loss both years") return ["loss","Loss both years"];
+  if (s === "Grew" && rv!=null && pv!=null) {
+    if (rv >= 15 && pv >= 20) return ["strong","Strong growth"];
+    if (pv >= 20 && pv - rv >= 20) return ["lever","Profit-led"];
+    return ["steady","Profit up"];
+  }
+  return ["steady", s || "—"];
+}
+DATA.results.forEach(r => r._tag = tagOf(r));
+const CURQ = DATA.meta.quarter || (DATA.results[0]||{}).quarter;
+const CUR = DATA.results.filter(r => r.quarter === CURQ);
+
+/* ---------- WhatsApp text builders (facts only) ---------- */
+function waResult(r){
+  let t = `*${r.name}* — ${r.quarter} results\nAnnounced: ${fmtDate(r.date)}\n`;
+  if (r.rev_cr) t += `Revenue: ${inr(r.rev_cr)} (${pct(r.rev_yoy)} YoY)\n`; else if (r.rev_yoy!=null) t += `Revenue: ${pct(r.rev_yoy)} YoY\n`;
+  if (r.pat_cr) t += `Net profit: ${inr(r.pat_cr)} (${r.pat_yoy!=null?pct(r.pat_yoy)+" YoY":r.pat_status})\n`;
+  else if (r.pat_yoy!=null) t += `Net profit: ${pct(r.pat_yoy)} YoY\n`;
+  else t += `Net profit: ${r.pat_status}\n`;
+  if (r.note) t += `${r.note}${noteNSE(r)?"":" (Unverified)"}\n`;
+  t += `${waSrc(r)}\n\n${DISCLAIMER}`;
+  return t;
+}
+function waDeal(d){
+  return `*${d.stock}* — ${d.type} deal (${d.exchange}), ${fmtDate(d.date)}\n${d.action === "Purchase" ? "Bought" : "Sold"} by: ${d.client}\nShares: ${units(d.qty)} (${d.pct.toFixed(2)}% of equity) at ₹${d.price}\nApprox. value: ₹${units(d.value_cr)} cr\n${waSrc(d)}\n\n${DISCLAIMER}`;
+}
+function waMonthly(m){
+  return `*${m.company}* — ${m.period}\n${m.metric}: ${units(m.value)}${m.yoy!=null?` (${pct(m.yoy)} YoY)`:""}\n${m.note?m.note+"\n":""}${waSrc(m)}\n\n${DISCLAIMER}`;
+}
+function waEvent(e){
+  return `*${e.company}* — ${e.type} (${fmtDate(e.date)})\n${e.text}\n${waSrc(e)}\n\n${DISCLAIMER}`;
+}
+function waX(x){
+  return `*${x.company}* — view from ${x.handle} on X (${fmtDate(x.date)})\n${x.text}\nOriginal post: ${x.url}\n\nThird-party view shared for information; not my recommendation.\n${DISCLAIMER}`;
+}
+function waCompany(name){
+  const k = name.toLowerCase();
+  const parts = [];
+  DATA.results.filter(r=>r.name.toLowerCase()===k).forEach(r=>parts.push(waResult(r).split("\n\n")[0]));
+  DATA.monthly.filter(m=>m.company.toLowerCase()===k).forEach(m=>parts.push(waMonthly(m).split("\n\n")[0]));
+  DATA.deals.filter(d=>d.stock.toLowerCase()===k).slice(0,5).forEach(d=>parts.push(waDeal(d).split("\n\n")[0]));
+  DATA.events.filter(e=>(e.company||"").toLowerCase()===k).slice(0,5).forEach(e=>parts.push(waEvent(e).split("\n\n")[0]));
+  DATA.xposts.filter(e=>(e.company||"").toLowerCase()===k).slice(0,3).forEach(e=>parts.push(waX(e).split("\n\n")[0]));
+  return parts.join("\n\n") + "\n\n" + DISCLAIMER;
+}
+
+/* Source rule (Abhinav, 17 Nov 2026): an item double-checked with NSE shows "Source: NSE";
+   anything else shows "Source: Unverified". */
+const isNSE = x => !!(x && x.src2 && /^nse/i.test(x.src2.name||"") && /nseindia/i.test(x.src2.url||""));
+/* a result's note with figures carries its own label unless NSE confirmed it */
+const noteNSE = x => !x.note || !/\d/.test(x.note) || !!(x.note_src2 && /^nse/i.test(x.note_src2.name||""));
+function waSrc(x){ return "Source: " + (isNSE(x) ? "NSE" : "Unverified"); }
+function shareBtns(text){
+  const f = document.createDocumentFragment();
+  const a = el("a","btn wa","WhatsApp");
+  a.href = "https://wa.me/?text=" + encodeURIComponent(text);
+  a.target = "_blank"; a.rel = "noopener";
+  const c = el("button","btn","Copy");
+  c.onclick = async () => { try { await navigator.clipboard.writeText(text); toast("Copied — paste into WhatsApp"); } catch(e){ toast("Copy blocked here — use the WhatsApp button"); } };
+  f.append(a,c);
+  return f;
+}
+function srcLink(name,url){
+  const s = el("span","src");
+  if (url){ const a = el("a",null,name); a.href=safeUrl(url); a.target="_blank"; a.rel="noopener"; s.append("Source: ",a); }
+  else s.textContent = "Source: " + name;
+  return s;
+}
+function srcLinks(x){
+  const s = el("span","src");
+  if (isNSE(x)){ const a=el("a",null,"NSE"); a.href=safeUrl(x.src2.url); a.target="_blank"; a.rel="noopener"; s.append("Source: ",a); }
+  else { s.append("Source: "); s.append(el("span","dc","Unverified")); }
+  return s;
+}
+let tt; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("show"),1800); }
+
+/* ---------- state ---------- */
+const st = { q:"", sector:"", sort:"date", tag:"all", dealAct:"all" };
+try { const s = JSON.parse(localStorage.getItem("qrt")||"{}"); Object.assign(st, {sort:s.sort||st.sort}); } catch(e){}
+const match = (...fields) => !st.q || fields.some(f => (f||"").toLowerCase().includes(st.q));
+
+/* ---------- results ---------- */
+const TAGS = [["all","All"],["turn","Turnaround"],["strong","Strong growth"],["lever","Profit-led"],["steady","Profit up"],["down","Profit down"],["loss","Loss both years"]];
+function renderChips(){
+  const box = $("#chips"); box.innerHTML="";
+  TAGS.forEach(([k,l])=>{
+    const n = k==="all" ? CUR.length : CUR.filter(r=>r._tag[0]===k).length;
+    if (!n) return;
+    const b = el("button","chip"+(st.tag===k?" on":""), `${l} · ${n}`);
+    b.onclick=()=>{st.tag=k;renderChips();renderResults();};
+    box.append(b);
+  });
+}
+function renderTiles(){
+  const R = CUR, comp = R.filter(r=>r.pat_status!=="Not compared");
+  const up = comp.filter(r=>r.pat_status==="Grew"||r.pat_status==="Back to profit").length;
+  const revs = R.map(r=>r.rev_yoy).filter(v=>v!=null).sort((a,b)=>a-b);
+  const med = revs.length ? revs[Math.floor(revs.length/2)] : null;
+  const tiles = [
+    ["Companies reported", R.length],
+    ["Profit up or back to profit", comp.length? Math.round(up/comp.length*100)+"%" : "—"],
+    ["Turnarounds", R.filter(r=>r._tag[0]==="turn").length],
+    ["NSE-verified", R.filter(isNSE).length + " of " + R.length],
+    ["Median revenue growth", med==null?"—":pct(med)],
+  ];
+  const box=$("#tiles"); box.innerHTML="";
+  tiles.forEach(([k,v])=>{ const t=el("div","tile"); t.append(el("div","k",k), el("div","v",String(v))); box.append(t); });
+}
+function resultCard(r){
+  const c = el("div","card");
+  const r1 = el("div","row1");
+  const nm = el("button","name",r.name); nm.onclick=()=>openCompany(r.name);
+  r1.append(nm, el("span","tag t-"+r._tag[0], r._tag[1]));
+  c.append(r1, el("div","meta", `${r.sector} · ${r.quarter} · announced ${fmtDate(r.date)}`));
+  const nums = el("div","nums");
+  const n1 = el("div","num"); n1.append(el("div","l","Revenue YoY"), el("div","x "+cls(r.rev_yoy), pct(r.rev_yoy)));
+  const n2 = el("div","num"); n2.append(el("div","l","Net profit YoY"), el("div","x "+cls(r.pat_yoy), r.pat_yoy!=null?pct(r.pat_yoy):r.pat_status));
+  nums.append(n1,n2);
+  if (r.pat_cr){ const n3=el("div","num"); n3.append(el("div","l","Net profit"), el("div","x",inr(r.pat_cr))); nums.append(n3); }
+  c.append(nums);
+  if (r.note){ const n=el("div","note",r.note+" "); if(!noteNSE(r)) n.append(el("span","dc","Unverified")); c.append(n); }
+  const a = el("div","acts"); a.append(shareBtns(waResult(r)), srcLinks(r)); c.append(a);
+  return c;
+}
+function renderResults(){
+  let R = CUR.filter(r => match(r.name, r.sector) && (!st.sector || r.sector===st.sector) && (st.tag==="all" || r._tag[0]===st.tag));
+  const k = st.sort;
+  R.sort((a,b)=> k==="name" ? a.name.localeCompare(b.name)
+    : k==="pat" ? (b.pat_yoy??-1e9)-(a.pat_yoy??-1e9)
+    : k==="rev" ? (b.rev_yoy??-1e9)-(a.rev_yoy??-1e9)
+    : b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+  const box=$("#list-results"); box.innerHTML="";
+  if (!R.length) box.append(el("div","empty","No companies match."));
+  R.forEach(r=>box.append(resultCard(r)));
+}
+
+/* ---------- deals ---------- */
+function renderDeals(){
+  const cb = $("#chips-deals"); cb.innerHTML="";
+  [["all","All"],["Purchase","Buys"],["Sell","Sells"]].forEach(([k,l])=>{
+    const b=el("button","chip"+(st.dealAct===k?" on":""),l); b.onclick=()=>{st.dealAct=k;renderDeals();}; cb.append(b);
+  });
+  const D = DATA.deals.filter(d=>match(d.stock,d.client) && (st.dealAct==="all"||d.action===st.dealAct))
+    .sort((a,b)=>b.date.localeCompare(a.date)||b.value_cr-a.value_cr);
+  const box=$("#list-deals"); box.innerHTML="";
+  if (!D.length) box.append(el("div","empty","No deals match."));
+  D.forEach(d=>{
+    const c=el("div","card"); const r1=el("div","row1");
+    const nm=el("button","name",d.stock); nm.onclick=()=>openCompany(d.stock);
+    r1.append(nm, el("span","tag "+(d.action==="Purchase"?"t-strong":"t-down"), d.action==="Purchase"?"Buy":"Sell"));
+    c.append(r1, el("div","meta",`${d.type} · ${d.exchange} · ${fmtDate(d.date)}`));
+    c.append(el("div",null,d.client));
+    const nums=el("div","nums");
+    [["Shares",units(d.qty)],["% of equity",d.pct.toFixed(2)+"%"],["Price","₹"+d.price],["Value","₹"+units(d.value_cr)+" cr"]].forEach(([l,v])=>{const n=el("div","num");n.append(el("div","l",l),el("div","x",v));nums.append(n);});
+    c.append(nums);
+    const a=el("div","acts"); a.append(shareBtns(waDeal(d)), srcLinks(d)); c.append(a);
+    box.append(c);
+  });
+}
+
+/* ---------- monthly ---------- */
+function renderMonthly(){
+  const M = DATA.monthly.filter(m=>match(m.company,m.metric)).sort((a,b)=>a.company.localeCompare(b.company));
+  const box=$("#list-monthly"); box.innerHTML="";
+  if (!M.length) box.append(el("div","empty","Nothing matches."));
+  M.forEach(m=>{
+    const c=el("div","card"); const r1=el("div","row1");
+    const nm=el("button","name",m.company); nm.onclick=()=>openCompany(m.company);
+    r1.append(nm); c.append(r1, el("div","meta",`${m.metric} · ${m.period}`));
+    const nums=el("div","nums");
+    const n1=el("div","num"); n1.append(el("div","l",m.period), el("div","x",units(m.value)));
+    const n2=el("div","num"); n2.append(el("div","l","YoY"), el("div","x "+cls(m.yoy), pct(m.yoy)));
+    nums.append(n1,n2);
+    if (m.prev){ const n3=el("div","num"); n3.append(el("div","l","Year ago"), el("div","x",units(m.prev))); nums.append(n3); }
+    c.append(nums); if (m.note) c.append(el("div","note",m.note));
+    const a=el("div","acts"); a.append(shareBtns(waMonthly(m)), srcLinks(m)); c.append(a);
+    box.append(c);
+  });
+}
+
+/* ---------- news & X ---------- */
+function renderNews(){
+  const N = DATA.xposts.map(x=>Object.assign({_x:true},x)).concat(DATA.events)
+    .filter(e=>match(e.company,e.text,e.type,e.handle)).sort((a,b)=>b.date.localeCompare(a.date));
+  const box=$("#list-news"); box.innerHTML="";
+  if (!N.length) box.append(el("div","empty","Nothing matches."));
+  N.forEach(e=>{
+    const c=el("div","card"); const r1=el("div","row1");
+    const nm=el("button","name",e.company); nm.onclick=()=>openCompany(e.company);
+    r1.append(nm, el("span","tag "+(e._x?"t-lever":"t-steady"), e._x?("X · "+(e.handle||"")):e.type));
+    c.append(r1, el("div","meta",fmtDate(e.date)));
+    if (e._x){ c.append(el("div","xlabel","Third-party view · "+(e.handle||"")), el("div","xpost",e.text)); }
+    else c.append(el("div",null,e.text));
+    const a=el("div","acts"); a.append(shareBtns(e._x?waX(e):waEvent(e))); if(e._x) a.append(srcLink("Post on X",e.url)); else a.append(srcLinks(e)); c.append(a);
+    box.append(c);
+  });
+}
+
+/* ---------- sectors ---------- */
+const QS = DATA.quarters || {};
+const qOrder = q => { const m=/Q(\d) FY(\d+)/.exec(q||""); return m? (+m[2])*10+(+m[1]) : 0; };
+const QLIST = Object.keys(QS).filter(q=>QS[q].overall).sort((a,b)=>qOrder(b)-qOrder(a));
+st.q2 = QLIST.includes(CURQ)?CURQ:QLIST[0]; st.secSort = "reported"; st.secDir = -1;
+const sg = v => v==null ? "—" : pct(v);
+const ofs = (a,b) => b ? `${a} of ${b}` : "—";
+function prevQ(q){ return QLIST.find(x=>qOrder(x)<qOrder(q)); }
+function waSectors(q){
+  const Q=QS[q]; if(!Q) return "";
+  let t = `*${q} results — sector scorecard*\n` + Q.narrative.join("\n") + "\n\n";
+  Q.sectors.filter(s=>s.profit_comparable>=3).slice(0,15).forEach(s=>{ t += `${s.sector}: profit grew ${ofs(s.profit_grew,s.profit_comparable)}, median profit ${sg(s.median_pat)}, median revenue ${sg(s.median_rev)}\n`; });
+  t += `\nSource: NSE\n\n${DISCLAIMER}`;
+  return t;
+}
+function waSector(q,s){
+  return `*${s.sector} — ${q} results*\nCompanies reported: ${s.reported}\nProfit grew: ${ofs(s.profit_grew,s.profit_comparable)}\nMedian profit growth: ${sg(s.median_pat)}\nMedian revenue growth: ${sg(s.median_rev)}\nBack to profit: ${s.back_to_profit} · Swung to loss: ${s.swung_to_loss}\nSource: NSE\n\n${DISCLAIMER}`;
+}
+function renderSectors(){
+  const sel=$("#qsel"); if(!sel.options.length){ QLIST.forEach(q=>{const o=el("option",null,q+(q===CURQ?" (current)":""));o.value=q;sel.append(o);}); sel.value=st.q2; sel.onchange=e=>{st.q2=e.target.value;renderSectors();}; }
+  const Q=QS[st.q2]; if(!Q){ $("#sec-narr").textContent="No sector data yet."; return; }
+  const P = prevQ(st.q2) ? QS[prevQ(st.q2)] : null;
+  const ov=Q.overall, pv=P?P.overall:null;
+  const pc=(a,b)=>b?Math.round(a/b*100)+"%":"—";
+  const tiles=[["Profit grew",pc(ov.profit_grew,ov.profit_comparable), pv?"prev "+pc(pv.profit_grew,pv.profit_comparable):ofs(ov.profit_grew,ov.profit_comparable)],
+    ["Revenue grew",pc(ov.rev_grew,ov.rev_comparable), pv?"prev "+pc(pv.rev_grew,pv.rev_comparable):ofs(ov.rev_grew,ov.rev_comparable)],
+    ["Median profit growth",sg(ov.median_pat), pv?"prev "+sg(pv.median_pat):""],
+    ["Median revenue growth",sg(ov.median_rev), pv?"prev "+sg(pv.median_rev):""],
+    ["Back to profit",ov.back_to_profit, ov.swung_to_loss+" swung to loss"]];
+  const tb=$("#sec-tiles"); tb.innerHTML="";
+  tiles.forEach(([k,v,s])=>{const t=el("div","tile"); t.append(el("div","k",k), el("div","v",String(v))); if(s) t.append(el("div","k",s)); tb.append(t);});
+  const nb=$("#sec-narr"); nb.innerHTML="";
+  nb.append(el("div","xlabel",`${Q.season||st.q2} · computed ${new Date(Q.computed_at).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"})} IST`));
+  Q.narrative.concat(Q.notes||[]).forEach(p=>nb.append(el("p",null,p)));
+  if(!P) nb.append(el("p","meta","Comparison with the previous season appears here once a second season is stored."));
+  const pmap={}; if(P) P.sectors.forEach(s=>pmap[s.sector]=s);
+  const cols=[["sector","Sector"],["reported","Reported"],["pg","Profit grew"],["median_pat","Median profit"],["median_rev","Median revenue"],["back_to_profit","Back to profit"]];
+  if(P) cols.splice(4,0,["prev_pat","Prev median profit"]);
+  const val=(s,k)=>k==="pg"?(s.profit_comparable?s.profit_grew/s.profit_comparable:null):k==="prev_pat"?(pmap[s.sector]||{}).median_pat:s[k];
+  const rows=[...Q.sectors].sort((a,b)=>{const x=val(a,st.secSort),y=val(b,st.secSort); if(st.secSort==="sector") return st.secDir*String(x).localeCompare(String(y)); return st.secDir*((x??-1e9)-(y??-1e9));});
+  const T=$("#sec-table"); T.innerHTML="";
+  const hr=el("tr"); cols.forEach(([k,l])=>{const th=el("th",null,l+(st.secSort===k?(st.secDir<0?" ↓":" ↑"):"")); th.onclick=()=>{ if(st.secSort===k) st.secDir*=-1; else {st.secSort=k; st.secDir=k==="sector"?1:-1;} renderSectors(); }; hr.append(th);}); T.append(hr);
+  const cell=(s,k)=>{ if(k==="pg") return ofs(s.profit_grew,s.profit_comparable); if(k==="median_pat"||k==="median_rev"||k==="prev_pat") return sg(val(s,k)); return String(s[k]); };
+  rows.forEach(s=>{ const tr=el("tr"); cols.forEach(([k])=>{ const td=el("td"); if(k==="sector"){ const b=el("button","name",s.sector); b.style.fontSize="13.5px"; b.onclick=()=>{ st.sector=s.sector; $("#sector").value=s.sector; st.tag="all"; location.hash="#results"; renderChips(); renderResults(); }; td.append(b); if(s.checked<s.reported) td.append(el("div","meta",`${s.reported-s.checked} unverified`)); } else { td.textContent=cell(s,k); if(k!=="reported"&&k!=="back_to_profit"&&k!=="pg") td.className=cls(val(s,k)); } tr.append(td); }); T.append(tr); });
+  const tr=el("tr","tot"); cols.forEach(([k])=>{ const td=el("td"); td.textContent = k==="sector"?"All companies":k==="prev_pat"?(pv?sg(pv.median_pat):"—"):cell(ov,k); tr.append(td);}); T.append(tr);
+  const sh=$("#sec-share"); sh.innerHTML=""; const a=el("div","acts"); a.append(shareBtns(waSectors(st.q2))); sh.append(a);
+}
+
+/* ---------- company sheet ---------- */
+function openCompany(name){
+  const k=name.toLowerCase(), box=$("#sheetbox"); box.innerHTML="";
+  const close=el("button","btn close","Close"); close.onclick=closeSheet;
+  box.append(close, el("h2",null,name));
+  const r=DATA.results.find(x=>x.name.toLowerCase()===k);
+  if (r) box.append(el("div","meta",r.sector));
+  const acts=el("div","acts"); acts.style.margin="10px 0"; acts.append(shareBtns(waCompany(name))); box.append(acts);
+  const sec=(title, items, fn)=>{ if(!items.length) return; box.append(el("h3",null,title)); items.forEach(i=>box.append(fn(i))); };
+  sec("Results (all quarters)", DATA.results.filter(x=>x.name.toLowerCase()===k).sort((a,b)=>b.date.localeCompare(a.date)), x=>{const d=el("div","mini",`${x.quarter}: revenue ${pct(x.rev_yoy)} YoY, net profit ${x.pat_yoy!=null?pct(x.pat_yoy)+" YoY":x.pat_status}${x.note?" — "+x.note:""} `); if(!isNSE(x)) d.append(el("span","dc","Unverified")); return d;});
+  sec("Monthly data", DATA.monthly.filter(x=>x.company.toLowerCase()===k), x=>{const d=el("div","mini",`${x.period} ${x.metric}: ${units(x.value)}${x.yoy!=null?" ("+pct(x.yoy)+" YoY)":""} `); if(!isNSE(x)) d.append(el("span","dc","Unverified")); return d;});
+  sec("Deals", DATA.deals.filter(x=>x.stock.toLowerCase()===k), x=>{const d=el("div","mini",`${fmtDate(x.date)} · ${x.action==="Purchase"?"Buy":"Sell"} · ${x.client} · ${x.pct.toFixed(2)}% at ₹${x.price} `); if(!isNSE(x)) d.append(el("span","dc","Unverified")); return d;});
+  sec("News", DATA.events.filter(x=>(x.company||"").toLowerCase()===k), x=>{const d=el("div","mini",`${fmtDate(x.date)} · ${x.text} `); if(!isNSE(x)) d.append(el("span","dc","Unverified")); return d;});
+  sec("Third-party views (X)", DATA.xposts.filter(x=>(x.company||"").toLowerCase()===k), x=>{const d=el("div","mini"); d.append(el("div","xlabel",`${x.handle} · ${fmtDate(x.date)}`), el("div","xpost",x.text)); const l=document.createElement("a"); l.href=safeUrl(x.url); l.target="_blank"; l.rel="noopener"; l.textContent="Post on X"; d.append(l); return d;});
+  $("#sheet").classList.add("on");
+}
+function closeSheet(){ $("#sheet").classList.remove("on"); }
+$("#sheet").addEventListener("click",e=>{ if(e.target.id==="sheet") closeSheet(); });
+
+/* ---------- routing & init ---------- */
+function show(){
+  const v = (location.hash||"#results").slice(1);
+  const view = ["results","deals","monthly","news","sectors"].includes(v)?v:"results";
+  document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on", s.id==="v-"+view));
+  document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===view));
+}
+function renderAll(){ renderResults(); renderDeals(); renderMonthly(); renderNews(); renderSectors(); }
+
+(function init(){
+  const m = DATA.meta;
+  const up = new Date(m.updated_at);
+  $("#sub").innerHTML = "";
+  $("#sub").append(`${m.season} · filing deadline ${fmtDate(m.deadline)} · `);
+  const b=el("b",null,"Updated "+up.toLocaleString("en-IN",{day:"numeric",month:"short",hour:"numeric",minute:"2-digit",timeZone:"Asia/Kolkata"})+" IST"); $("#sub").append(b);
+  $("#sub").append(" · refreshes 6 AM, 11 AM, 2 PM IST");
+  $("#n-results").textContent=CUR.length; $("#n-deals").textContent=DATA.deals.length;
+  $("#n-monthly").textContent=DATA.monthly.length; $("#n-news").textContent=DATA.events.length+DATA.xposts.length;
+  const secs=[...new Set(CUR.map(r=>r.sector))].sort();
+  secs.forEach(s=>{const o=el("option",null,s);o.value=s;$("#sector").append(o);});
+  $("#sort").value=st.sort;
+  $("#q").addEventListener("input",e=>{st.q=e.target.value.trim().toLowerCase();renderAll();});
+  $("#sector").addEventListener("change",e=>{st.sector=e.target.value;renderResults();});
+  $("#sort").addEventListener("change",e=>{st.sort=e.target.value;try{localStorage.setItem("qrt",JSON.stringify({sort:st.sort}));}catch(_){};renderResults();});
+  $("#foot").textContent = m.coverage_note + " Source: NSE means the figures match the company's filing or data on NSE; Source: Unverified means they have not yet been matched with NSE. Check the original filing before relying on a number. " + DISCLAIMER.replace("\n"," ");
+  renderTiles(); renderChips(); renderAll(); show();
+  window.addEventListener("hashchange",show);
+})();
+</script>
+</body>
+</html>

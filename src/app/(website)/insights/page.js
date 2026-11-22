@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 import styles from './page.module.css';
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import TrackerCard from '@/components/TrackerCard';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -156,6 +157,9 @@ export default function Insights() {
             </motion.p>
           </div>
         </section>
+
+        {/* Quarterly Results Tracker (hidden until it has data) */}
+        <TrackerCard />
 
         {/* Hero Carousel — Infographics */}
         {!loading && infographics.length > 0 && (

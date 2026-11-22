@@ -31,6 +31,14 @@ Every conversation from the chat assistant and the research tools: who (name and
 ### Insights
 Add, edit, publish, hide or delete insights: PDF reports (converted to articles), written articles and infographics. Details in [guide 03](03-insights.md).
 
+### Results Tracker
+Updates the Quarterly Results Tracker on the Insights page.
+- The top shows the season, when it was last updated and how many results, deals, monthly numbers, news items and X posts it holds.
+- **Choose update file:** pick `new.json` (a normal update) or a full `library.json`. The page shows what the file contains. A normal update **adds new items and replaces matching ones**; a full library **replaces everything** (it asks to confirm).
+- After **Apply update** you see how many items were added, replaced or skipped, with the reason for anything skipped (missing source, wrong date format, a link that is not http/https).
+- **Download the current library.json** to keep a copy or to run your own offline process.
+- The **update history** lists every update with who made it.
+
 ### FAQs
 The "Investors are asking" box on the home page.
 - **Add question** and answer (the answer ends with a "book a consultation" link automatically).

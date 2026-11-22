@@ -54,6 +54,7 @@ const adminItems = [
   { name: 'Chat Logs', href: '/admin/chats', icon: Headphones },
   { name: 'Market Data', href: '/admin/market-data', icon: Globe },
   { name: 'Insights', href: '/admin/insights', icon: Newspaper },
+  { name: 'Results Tracker', href: '/admin/results-tracker', icon: TrendingUp },
   { name: 'FAQs', href: '/admin/faqs', icon: HelpCircle },
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Client Access', href: '/admin/clients', icon: UserCheck },

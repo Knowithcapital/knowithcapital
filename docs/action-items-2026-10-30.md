@@ -160,3 +160,23 @@ Abhinav's analytics reports are now delivered as **PDFs** (sample: the 91-page, 
 - [ ] **After deploying, open Admin → Market Data** and check the risk-free rate card loads, then **Admin → Portfolio Reports** and **Admin → FAQs / Products**.
 - [ ] **Test the portfolio flow end to end** (see the portfolio section above): needs Cloudinary connected on Vercel first.
 - [ ] **Database change:** this build replaces the earlier `ClientReport` table with a new `PortfolioReport` table. The earlier table was never used for real data, and the build's `prisma db push` drops it.
+
+---
+
+## 7. Quarterly Results Tracker on the Insights page (22 Nov)
+
+Abhinav's tracker (`template.html`, `build.py`, `library.json`, `index.html`) now lives on the website. Details and the source list are in [results-tracker.md](results-tracker.md).
+
+- [x] **Store all the tracker data in the database** (one library record, a summary and an update log) and **load it every time** the page opens. — Us (code done)
+- [x] **Port `build.py` to the website** so an admin update applies the same rules (merge by key, double-check flags, NSE-verified aggregates, sector narrative, 60-day retention). Checked: identical totals, sector table and narrative on the supplied library. — Us (code done)
+- [x] **Admin → Results Tracker:** upload `new.json` (merge) or a full `library.json` (replace), see added / replaced / skipped, update history, download the current library. — Us (code done)
+- [x] **Show it on the Insights page:** a card with live counts, and a page at `/insights/quarterly-results` with the tracker in a self-sandboxed frame, recoloured to the site theme. — Us (code done)
+- [x] **Check where the data was collected** (Craytheon scorecard and company filings; NSE and Screener.in for verification; Trendlyne and NSE for deals; Upstox, RushLane and others for monthly numbers; X for third-party views). Listed in [results-tracker.md](results-tracker.md). — Us
+- [x] **Load the supplied library into the database** (489 results, 120 deals, 15 monthly, 146 events, 693 X posts). Loaded into the new database. — Us
+- [ ] **Load the library into the live database** (or upload `library.json` once in Admin → Results Tracker after deploying). — Us
+- [ ] **Automatic fetching of new data** is not built: the sources are third-party sites whose terms and bot protection we must not bypass. It needs permitted access (an NSE data licence or feed, Trendlyne and X API subscriptions or another provider). Decide whether to pursue it and with which feeds. — Abhinav / Us
+- [ ] **Who prepares `new.json`, and how often** (the page promises refreshes at 6 AM, 11 AM and 2 PM IST). — Abhinav
+- [ ] **Confirm the right to republish** NSE data, Trendlyne deal data and verbatim X posts, and drop whatever he is not licensed to show. — Abhinav
+- [ ] **Compliance check** of the tracker's content (promoter and marquee-investor deals, third-party stock commentary) against SEBI's rules for who may publish research. — Abhinav
+- [ ] **Confirm ARN 46498** (taken from the tracker's disclaimer) and replace the placeholder ARN in the footer and the trust bar. — Abhinav / Us
+- [ ] **After deploying:** set the new `POSTGRES_*` variables, run the schema update, upload the library, and open `/insights` to check the card and `/insights/quarterly-results`. — Us

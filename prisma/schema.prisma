@@ -383,3 +383,29 @@ model PortfolioReport {
   uploadedAt DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 }
+
+// ── Quarterly Results Tracker (shown on the Insights page; managed in Admin → Results Tracker) ──
+// One row holds the whole tracker library (meta, results, deals, monthly numbers, events, X posts and
+// the per-quarter archive). Admin updates merge new items into it; the page reads it from here.
+model TrackerData {
+  id        String   @id @default("library")
+  data      Json     // the library, in the same shape as the original library.json
+  summary   Json?    // small copy (season, updated time, counts) so the Insights card does not load the whole library
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// Log of every update, so you can see what changed and when
+model TrackerUpdate {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  mode      String   // merge | replace
+  fileName  String?
+  added     Json     // items added per section
+  replaced  Json     // items replaced per section
+  skipped   Int      @default(0)
+  totals    Json     // totals per section after the update
+  updatedBy String?
+
+  @@index([createdAt])
+}

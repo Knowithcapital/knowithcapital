@@ -47,3 +47,17 @@ Covers the **Insights** page (`/insights`), each **article page**, and the **Ins
 - One PDF at a time; very large PDFs may take longer to convert.
 - The AI reads the PDF as images, so scanned or low-quality PDFs convert less accurately.
 - Taxation write-up: when you send your text and tables, upload them the same way (as a PDF or a written article).
+
+## The Quarterly Results Tracker
+
+A live tracker for the current results season sits on the Insights page as a dark card (**Quarterly Results Tracker**) and opens on its own page.
+
+**What visitors see:** tabs for **Results** (every company's profit and revenue growth, with filters and a search), **Deals** (bulk and block deals), **Monthly data** (for example monthly vehicle sales), **News and X** (company events and third-party views) and **Sectors** (how each sector did compared with the last season). Every item shows its source. Items confirmed against the company's NSE filing say **Source: NSE**; the rest are marked **Unverified**. Each item has a WhatsApp button to share it with a short disclaimer.
+
+**Where the data comes from:** the figures were collected from Craytheon's results scorecard and company filings on NSE, Screener.in, Trendlyne deal data, financial news sites and a few X accounts. Each item records its first source and, where one exists, a second independent source. The full list of sources is in [results-tracker.md](../results-tracker.md).
+
+**Where it is stored:** in the website's private database, as one record. The page reads it from there each time (a copy is kept for about five minutes so it opens quickly).
+
+**How it is updated:** in **Admin → Results Tracker** you upload the update file (`new.json`) from your collection process. New items are added and an item with the same company, quarter or date is replaced by the newer one. The website then re-checks every item (second source present or not), recomputes the sector summary and keeps the latest 60 days of deals, news and posts (results are kept for every quarter). The page shows the new data within about five minutes. A log in the same screen lists every update: when, which file, how many items were added, replaced or skipped.
+
+**What is not automatic:** the website does not go out and fetch new data from those sources by itself. Someone prepares the update file as before. Automatic fetching needs permitted data access (for example an NSE data licence and the Trendlyne or X paid APIs); see the questions in [results-tracker.md](../results-tracker.md).

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate && prisma db push --accept-data-loss",
+    "tracker:import": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/import-tracker.mjs",
     "admin:create": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/create-admin.mjs"
   },
   "dependencies": {
