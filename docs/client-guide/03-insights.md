@@ -32,7 +32,7 @@ Covers the **Insights** page (`/insights`), each **article page**, and the **Ins
 | Item | Where |
 |---|---|
 | Title, summary, type, publish date, published or draft, the structured article | Website database (the insights table) |
-| The PDF, cover image, cropped charts, infographic images | The public storage bucket (Cloudflare R2). Pictures only show if file storage is connected; if charts or images are missing, tell the developer |
+| The PDF, cover image, cropped charts, infographic images | Public file storage (Cloudinary). Pictures only show if file storage is connected; if charts or images are missing, tell the developer |
 | Who can see it | Anyone, once published. Drafts are visible only to admins |
 
 ## Logic and ordering
@@ -40,7 +40,7 @@ Covers the **Insights** page (`/insights`), each **article page**, and the **Ins
 - **Order:** newest publish date first on the home page and the Insights page.
 - **Homepage strip:** shows the three newest published items of any type.
 - **Report and article cards** use the date you published; infographics go to the carousel, not the card list.
-- **Download PDF** gives the original uploaded PDF unchanged.
+- **Download PDF** gives the original uploaded PDF unchanged, served through the website.
 
 ## Limits
 

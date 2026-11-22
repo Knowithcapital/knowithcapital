@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { privateFileUrl, privateStorageMode, readPrivateLocal, safeFileName } from '@/lib/storage';
-
-/** Largest portfolio PDF accepted. (Detailed family reports run to tens of MB.) */
-export const MAX_PORTFOLIO_PDF_BYTES = 60 * 1024 * 1024;
+import { fetchPrivateFromCloudinary, privateFileUrl, privateStorageMode, readPrivateLocal, safeFileName } from '@/lib/storage';
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
@@ -36,9 +33,24 @@ export function parseReportDate(value: unknown): Date | null {
 
 /**
  * Sends a stored report to a caller that has already been authorised:
+ * Cloudinary → the file streamed from a signed server-side request (its address is never shown to the client);
  * R2 → a redirect to a one-minute signed link; local development → the file itself.
  */
 export async function sendPortfolioFile(key: string, fileName: string, download: boolean): Promise<NextResponse> {
+  const disposition = `${download ? 'attachment' : 'inline'}; filename="${safeFileName(fileName) || 'report.pdf'}"`;
+  if (privateStorageMode() === 'cloudinary') {
+    const upstream = await fetchPrivateFromCloudinary(key);
+    if (!upstream.ok || !upstream.body) return NextResponse.json({ error: 'The report file could not be found' }, { status: 404 });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': disposition,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    };
+    const length = upstream.headers.get('content-length');
+    if (length) headers['Content-Length'] = length;
+    return new NextResponse(upstream.body, { headers });
+  }
   if (privateStorageMode() === 'r2') {
     const url = await privateFileUrl(key, fileName, download);
     return NextResponse.redirect(url, { status: 302, headers: { 'Cache-Control': 'private, no-store' } });
@@ -48,7 +60,7 @@ export async function sendPortfolioFile(key: string, fileName: string, download:
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${safeFileName(fileName) || 'report.pdf'}"`,
+        'Content-Disposition': disposition,
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },

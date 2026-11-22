@@ -54,9 +54,9 @@ Covers the **Login** page (`/login`), the **research tools** and **Your portfoli
 3. Each client has **one** report. **When you upload a new one, the previous one is replaced and its file is deleted automatically.** Only the latest is ever kept.
 4. When that client signs in, they see their report. Nobody else can open it.
 
-**Where it is stored:** the PDF is kept in a **private storage bucket** (Cloudflare R2) that has no public address. The website database keeps only a small record: which client, the file name and size, the "as on" date and when it was uploaded. A client's PDF is opened through a link that **expires after one minute** and is only created after the website has checked who is asking.
+**Where it is stored:** the PDF is kept in **private file storage** (Cloudinary) that has no public address. The website database keeps only a small record: which client, the file name and size, the "as on" date and when it was uploaded. The website streams the PDF to the client only after it has checked who is signed in; the storage address itself is never shown to the client.
 
 **Limits**
-- Each PDF can be up to **60 MB** (large family reports of 15 MB and more are fine).
+- Each PDF can be up to **10 MB** on the current storage plan. Bigger reports (the sample is about 15 MB) need to be compressed first, or the storage plan upgraded. The admin page tells you if a file is too large.
 - If a client is suspended or removed in Client Access, they lose access immediately. Removing a client also deletes their PDF.
 - Phones sometimes cannot show a PDF inside a page, so the page always offers **Open in new tab** and **Download PDF** buttons.

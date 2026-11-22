@@ -48,25 +48,29 @@ Source: Gemini notes and the full transcript of the 30 Oct 2026 call (Abhinav Me
 
 ### Client portfolio reports (changed on 18 Nov: now one PDF per client)
 
-Abhinav's analytics reports are now delivered as **PDFs** (sample: the 91-page, 15 MB "Investment Snapshot" family report), uploaded per client from the admin panel, stored in a **private Cloudflare R2 bucket**, replaced each month, and downloadable by the client.
+Abhinav's analytics reports are now delivered as **PDFs** (sample: the 91-page, 15 MB "Investment Snapshot" family report), uploaded per client from the admin panel, stored in a **private Cloudinary storage**, replaced each month, and downloadable by the client.
 
 - [x] **Upload a PDF per client in the admin panel.** Admin → Portfolio Reports: choose PDF(s), pick the client, check the "as on" date; the client and date are pre-filled from the file name (code done, needs deploy and R2). — Us
 - [x] **One report per client; a new upload automatically deletes the previous file** from storage. — Us (code done)
 - [x] **Client sees a My Portfolio tab after signing in** (login → "Your portfolio", or the side menu): read the PDF on the page, open it in a new tab, or download it. — Us (code done)
 - [x] **Private storage:** the PDF sits in a private bucket and is opened only through a one-minute signed link after the site checks the signed-in client. Removing a client deletes their PDF. — Us (code done)
-- [x] **Large files:** the browser uploads straight to R2 so files of tens of MB work (limit 60 MB). — Us (code done)
+- [x] **Large files:** the browser uploads straight to storage, bypassing the website server's size limit. The current Cloudinary Free plan caps each file at **10 MB**, so the 15 MB sample will not upload until it is compressed or the plan is upgraded (see the open item below). — Us (code done)
 - [x] **Support bulk upload:** several PDFs at once. — Us (code done)
-- [ ] **Set up Cloudflare R2 and connect it** (two buckets, an access key, CORS, six environment variables). Step-by-step in [storage-setup-r2.md](storage-setup-r2.md). Until this is done, uploads are switched off on the live site. — Us
-- [ ] **Test the full flow after R2 is connected** with the sample PDF and a real client email: upload, sign in, view, download, then upload a second PDF and confirm the first disappears from the bucket. — Us
+- [x] **Cloudinary connected locally** (`CLOUDINARY_URL` in `.env.local`) and tested end to end: private upload, signed read, anonymous access blocked (401), delete, and public image/PDF upload. — Us
+- [ ] **Add `CLOUDINARY_URL` to Vercel (Production) and redeploy.** Until then uploads are switched off on the live site. Steps in [storage-setup-cloudinary.md](storage-setup-cloudinary.md). — Us
+- [ ] **Rotate the Cloudinary API secret**, since it was shared in a chat (Settings → API Keys). — Us
+- [ ] **Decide how to handle reports over 10 MB** (the sample is 15 MB): compress the PDF, upgrade the Cloudinary plan, or use Cloudflare R2 for the private reports ([storage-setup-r2.md](storage-setup-r2.md), already supported). — Abhinav / Us
+- [ ] **Test the full flow after Cloudinary is connected on Vercel** with the sample PDF and a real client email: upload, sign in, view, download, then upload a second PDF and confirm the first disappears from Cloudinary. — Us
 - [ ] **Decide the monthly routine:** who uploads, and by which day each month. Optionally email clients when a new report is uploaded. — Abhinav / Us
 - [x] ~~Admin upload of HTML reports with an on-page viewer~~ — replaced by the PDF flow above (the earlier HTML version was removed before it was used).
 - [ ] **Universal report layout:** no longer needed if reports are always the PDF Abhinav exports. Confirm with him whether the interactive-HTML idea is dropped or comes back later. — Abhinav
 - [ ] **Merge the interactive HTML chart into the final report:** parked until Abhinav confirms whether the PDF replaces it. — Us
 
-### File storage: move to Cloudflare R2
+### File storage: Cloudinary
 
-- [x] **Insights uploads (PDFs, covers, charts) now use R2** when it is configured; older files saved on Vercel Blob keep working. (Code done, needs R2 set up.) — Us
-- [ ] **Connect R2** as above and re-test an insight PDF upload and conversion. — Us
+- [x] **Insights uploads (PDFs, covers, charts) now use Cloudinary** when it is configured; older files saved on Vercel Blob keep working. Cloudflare R2 remains supported as an alternative. (Code done, needs the variable on Vercel.) — Us
+- [x] **Insight "Download PDF" now goes through the website** (`/api/v1/insights/<id>/pdf`), because Cloudinary blocks direct public links to PDFs by default. Drafts stay admin-only. (Code done.) — Us
+- [ ] **Re-test an insight PDF upload, conversion and the Download PDF button** once Cloudinary is connected on Vercel. — Us
 
 ### Custom investor performance chart
 
@@ -154,5 +158,5 @@ Abhinav's analytics reports are now delivered as **PDFs** (sample: the 91-page, 
 
 - [ ] **Push the drawdown/NAV-history fix** (`f2971d1`) and the new work. Two schema changes are additive and are created by the build's `prisma db push`: the `ClientReport` table and a new `riskFreeRatePct` column on `AppConfig`.
 - [ ] **After deploying, open Admin → Market Data** and check the risk-free rate card loads, then **Admin → Portfolio Reports** and **Admin → FAQs / Products**.
-- [ ] **Test the portfolio flow end to end** (see the portfolio section above): needs R2 connected first.
+- [ ] **Test the portfolio flow end to end** (see the portfolio section above): needs Cloudinary connected on Vercel first.
 - [ ] **Database change:** this build replaces the earlier `ClientReport` table with a new `PortfolioReport` table. The earlier table was never used for real data, and the build's `prisma db push` drops it.

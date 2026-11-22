@@ -14,7 +14,6 @@ type Pending = {
 };
 
 const inputClass = 'bg-[#0A0A0F] border border-[#2E2E3E] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500';
-const MAX_BYTES = 60 * 1024 * 1024;
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 const label = (c: { name: string | null; email: string }) => (c.name ? `${c.name} — ${c.email}` : c.email);
@@ -85,7 +84,8 @@ function ClientPicker({ clients, value, onChange }: { clients: Client[]; value: 
 export default function PortfolioReportsAdminPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [storage, setStorage] = useState<'r2' | 'local' | 'none'>('r2');
+  const [storage, setStorage] = useState<'cloudinary' | 'r2' | 'local' | 'none'>('r2');
+  const [maxBytes, setMaxBytes] = useState(60 * 1024 * 1024);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -99,6 +99,7 @@ export default function PortfolioReportsAdminPage() {
     if (!res.ok) throw new Error(json.error || 'Could not load reports');
     setReports(json.reports || []);
     setStorage(json.storage);
+    if (json.maxBytes) setMaxBytes(json.maxBytes);
   };
 
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function PortfolioReportsAdminPage() {
     ])
       .then(([rep, cl]) => {
         if (cancelled) return;
-        if (rep.ok) { setReports(rep.json.reports || []); setStorage(rep.json.storage); }
+        if (rep.ok) { setReports(rep.json.reports || []); setStorage(rep.json.storage); if (rep.json.maxBytes) setMaxBytes(rep.json.maxBytes); }
         else setMessage({ ok: false, text: rep.json.error || 'Could not load reports' });
         setClients((cl.clients || []).filter((c: Client) => c.isActive));
       })
@@ -123,7 +124,7 @@ export default function PortfolioReportsAdminPage() {
     const next: Pending[] = [];
     for (const f of Array.from(files)) {
       if (!/\.pdf$/i.test(f.name)) { setMessage({ ok: false, text: `${f.name} is not a PDF and was skipped.` }); continue; }
-      if (f.size > MAX_BYTES) { setMessage({ ok: false, text: `${f.name} is larger than 60 MB and was skipped.` }); continue; }
+      if (f.size > maxBytes) { setMessage({ ok: false, text: `${f.name} is ${formatSize(f.size)}, which is over the ${Math.round(maxBytes / 1024 / 1024)} MB limit of the current storage plan, so it was skipped. Compress the PDF and try again.` }); continue; }
       next.push({
         key: `${f.name}-${f.size}-${Math.random().toString(36).slice(2, 7)}`,
         file: f, email: guessClient(f.name, clients), reportDate: dateFromName(f.name), status: 'ready',
@@ -143,10 +144,21 @@ export default function PortfolioReportsAdminPage() {
     const startJson = await start.json().catch(() => ({}));
     if (!start.ok) throw new Error(startJson.error || 'Could not start the upload');
 
-    if (startJson.mode === 'r2') {
+    if (startJson.mode === 'r2' || startJson.mode === 'cloudinary') {
       // 2. send the PDF straight to storage, 3. tell the website to attach it to the client
-      const put = await fetch(startJson.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: item.file });
-      if (!put.ok) throw new Error(`Upload to storage failed (${put.status}). Check the bucket's CORS settings.`);
+      if (startJson.mode === 'cloudinary') {
+        const form = new FormData();
+        for (const [k, v] of Object.entries(startJson.fields as Record<string, string>)) form.append(k, v);
+        form.append('file', item.file);
+        const up = await fetch(startJson.uploadUrl, { method: 'POST', body: form });
+        if (!up.ok) {
+          const out = await up.json().catch(() => ({}));
+          throw new Error(out?.error?.message || `Upload to storage failed (${up.status})`);
+        }
+      } else {
+        const put = await fetch(startJson.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: item.file });
+        if (!put.ok) throw new Error(`Upload to storage failed (${put.status}). Check the bucket's CORS settings.`);
+      }
       const res = await fetch('/api/v1/admin/portfolio-reports', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: item.email, key: startJson.key, fileName: item.file.name, reportDate: item.reportDate || null }),
@@ -214,7 +226,7 @@ export default function PortfolioReportsAdminPage() {
         {storage === 'none' && (
           <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            Private file storage is not connected yet, so uploads are switched off. Set the Cloudflare R2 variables (R2_*) on the project to enable them.
+            Private file storage is not connected yet, so uploads are switched off. Connect Cloudinary (CLOUDINARY_URL) or Cloudflare R2 (R2_*) on the project to enable them.
           </div>
         )}
 
@@ -232,7 +244,7 @@ export default function PortfolioReportsAdminPage() {
               <Upload className="w-4 h-4" /> Choose PDF report(s)
               <input type="file" multiple accept="application/pdf,.pdf" className="hidden" disabled={storage === 'none'} onChange={e => { pickFiles(e.target.files); e.target.value = ''; }} />
             </label>
-            <span className="text-xs text-gray-500">PDFs up to 60 MB. You can choose several at once. The client and date are filled in from the file name when it contains them.</span>
+            <span className="text-xs text-gray-500">PDFs up to {Math.round(maxBytes / 1024 / 1024)} MB. You can choose several at once. The client and date are filled in from the file name when it contains them.</span>
           </div>
 
           {pending.length > 0 && (

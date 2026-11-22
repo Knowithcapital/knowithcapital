@@ -1,6 +1,8 @@
-# File storage setup — Cloudflare R2
+# File storage setup — Cloudflare R2 (alternative)
 
-The website keeps uploaded files in Cloudflare R2 (an S3-compatible bucket). It uses **two buckets**:
+> **The website now uses Cloudinary by default** (see [storage-setup-cloudinary.md](storage-setup-cloudinary.md)). Cloudinary's Free plan caps files at 10 MB. Use this R2 setup instead if you need larger portfolio PDFs: remove the `CLOUDINARY_URL` variable and set the `R2_*` variables below.
+
+The website can keep uploaded files in Cloudflare R2 (an S3-compatible bucket). It uses **two buckets**:
 
 | Bucket | Holds | Access |
 |---|---|---|

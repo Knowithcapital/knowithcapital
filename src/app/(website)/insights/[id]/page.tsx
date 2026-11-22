@@ -74,7 +74,7 @@ export default async function InsightDetailPage(props: PageProps) {
             title={insight.title}
             description={insight.description}
             publishedAt={insight.publishedAt}
-            pdfUrl={insight.contentUrl}
+            pdfUrl={insight.contentUrl ? `/api/v1/insights/${insight.id}/pdf${insight.isActive ? '' : '?preview=1'}` : null}
             isDraft={!insight.isActive}
             related={related}
           />
@@ -113,7 +113,7 @@ export default async function InsightDetailPage(props: PageProps) {
 
           {insight.contentUrl?.toLowerCase().includes('.pdf') && (
             <p style={{ marginTop: '32px' }}>
-              <a href={insight.contentUrl} target="_blank" rel="noopener noreferrer" className={styles.backLink}>Download PDF →</a>
+              <a href={`/api/v1/insights/${insight.id}/pdf${insight.isActive ? '' : '?preview=1'}`} target="_blank" rel="noopener noreferrer" className={styles.backLink}>Download PDF →</a>
             </p>
           )}
         </div>

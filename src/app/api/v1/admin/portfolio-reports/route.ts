@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth/guards';
 import {
-  deletePrivate, inspectPrivate, isPortfolioKey, newPortfolioKey, privateStorageMode, savePrivateLocal,
+  deletePrivate, inspectPrivate, isPortfolioKey, newPortfolioKey, privateMaxBytes, privateStorageMode, savePrivateLocal,
 } from '@/lib/storage';
-import { dateFromFileName, MAX_PORTFOLIO_PDF_BYTES, parseReportDate } from '@/lib/portfolioReport';
+import { dateFromFileName, parseReportDate } from '@/lib/portfolioReport';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ export async function GET() {
         client: { select: { id: true, name: true, email: true } },
       },
     });
-    return NextResponse.json({ reports, storage: privateStorageMode() });
+    return NextResponse.json({ reports, storage: privateStorageMode(), maxBytes: privateMaxBytes() });
   } catch (error) {
     console.error('[PortfolioReports] List failed:', error);
     return NextResponse.json({ error: 'Report table is not ready. Run `npx prisma db push` (or redeploy) to create it.' }, { status: 500 });
@@ -29,7 +29,7 @@ export async function GET() {
 
 /**
  * POST /api/v1/admin/portfolio-reports — attach a PDF to a client, replacing their previous report.
- *   JSON (R2):       { email, key, fileName, reportDate? } after the browser has uploaded the file with the link from /upload-url
+ *   JSON (cloud):    { email, key, fileName, reportDate? } after the browser has uploaded the file using /upload-url
  *   multipart (dev): fields email, file, reportDate?  — local development only
  * The old report's file is deleted once the new one is saved.
  */
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const mode = privateStorageMode();
   if (mode === 'none') {
-    return NextResponse.json({ error: 'Private file storage is not configured. Set the Cloudflare R2 variables (R2_*) on the project.' }, { status: 503 });
+    return NextResponse.json({ error: 'Private file storage is not configured. Connect Cloudinary (CLOUDINARY_URL) or Cloudflare R2 (R2_*) on the project.' }, { status: 503 });
   }
 
   let key = '';
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
-      if (mode !== 'local') return NextResponse.json({ error: 'Upload the file using the storage link' }, { status: 400 });
+      if (mode !== 'local') return NextResponse.json({ error: 'Upload the file using the storage upload link' }, { status: 400 });
       const form = await req.formData();
       const file = form.get('file');
       if (!(file instanceof File) || file.size === 0) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     // Check the stored object is really a PDF of a sensible size
     const stored = await inspectPrivate(key);
     if (!stored) return fail(400, 'The uploaded file was not found in storage. Please try the upload again.');
-    if (stored.size > MAX_PORTFOLIO_PDF_BYTES) return fail(413, `The PDF is larger than ${MAX_PORTFOLIO_PDF_BYTES / 1024 / 1024} MB.`);
+    if (stored.size > privateMaxBytes()) return fail(413, `The PDF is larger than ${privateMaxBytes() / 1024 / 1024} MB.`);
     if (!stored.head.startsWith('%PDF-')) return fail(400, 'That file is not a PDF.');
 
     if (await prisma.portfolioReport.findFirst({ where: { fileKey: key }, select: { id: true } })) {

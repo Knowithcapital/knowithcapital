@@ -15,8 +15,8 @@ export async function GET() {
 
 /**
  * Public uploads (insight PDFs and images), by storage backend:
- *   • r2     — JSON { fileName, contentType, size, folder? }: returns a one-time link the browser
- *              PUTs the file to directly, plus the file's public URL (no app-server size limit).
+ *   • cloudinary / r2 — JSON { fileName, contentType, size, folder? }: returns a one-time signed upload
+ *              the browser sends the file to directly (no app-server size limit).
  *   • blob   — JSON: Vercel Blob client-upload handshake (legacy).
  *   • local  — multipart form (development only).
  */
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const mode = publicStorageMode();
 
   if (contentType.includes('application/json')) {
-    if (mode === 'r2') {
+    if (mode === 'r2' || mode === 'cloudinary') {
       try {
         const { fileName, contentType: fileType, size, folder } = await req.json();
         if (typeof fileName !== 'string' || !ALLOWED_TYPES.includes(fileType)) {

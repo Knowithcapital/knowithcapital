@@ -10,6 +10,10 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  CLOUDINARY_FREE_MAX_BYTES, cloudinaryBytes, cloudinaryDestroy, cloudinaryDownloadUrl, cloudinaryEnabled,
+  cloudinaryUpload, parseCloudinaryUrl, resourceFor, signedUpload,
+} from '@/lib/cloudinary';
 
 // ────────────────────────────────────────────────────────────────
 // File storage.
@@ -20,6 +24,10 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //     through short-lived signed links after the app has checked who is asking.
 //
 // Backends, in order of preference:
+//   0. Cloudinary — set CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
+//        Public files use delivery type "upload"; private files use "authenticated" (no public
+//        address; read only through signed requests made by this server). The free plan caps
+//        each file at 10 MB.
 //   1. Cloudflare R2 (S3-compatible)  — set the R2_* variables below.
 //        R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 //        R2_PUBLIC_BUCKET + R2_PUBLIC_URL   → public files (R2_PUBLIC_URL is the bucket's public
@@ -65,7 +73,8 @@ export function safeFileName(name: string): string {
 // ── Public files ────────────────────────────────────────────────
 
 /** Which backend public uploads use right now. */
-export function publicStorageMode(): 'r2' | 'blob' | 'local' {
+export function publicStorageMode(): 'cloudinary' | 'r2' | 'blob' | 'local' {
+  if (cloudinaryEnabled()) return 'cloudinary';
   if (r2PublicEnabled()) return 'r2';
   if (blobEnabled()) return 'blob';
   return 'local';
@@ -83,6 +92,14 @@ function publicKey(pathname: string): string {
 export async function saveFile(pathname: string, data: Buffer | ArrayBuffer, contentType: string): Promise<string> {
   const body = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
+  if (cloudinaryEnabled()) {
+    const resource = resourceFor(contentType);
+    const key = publicKey(pathname);
+    // Image public ids carry no extension; raw ones (PDFs) keep theirs
+    const publicId = resource === 'image' ? key.replace(/\.[A-Za-z0-9]+$/, '') : key;
+    const out = await cloudinaryUpload(body, { resource, type: 'upload', publicId, mime: contentType, fileName: path.basename(key) });
+    return out.secureUrl;
+  }
   if (r2PublicEnabled()) {
     const key = publicKey(pathname);
     await client().send(new PutObjectCommand({ Bucket: env('R2_PUBLIC_BUCKET'), Key: key, Body: body, ContentType: contentType }));
@@ -103,19 +120,29 @@ export async function saveFile(pathname: string, data: Buffer | ArrayBuffer, con
 }
 
 /** A one-time link the browser can PUT a public file to directly (keeps big files off the app server). */
-export async function createPublicUpload(folder: string, fileName: string, contentType: string): Promise<{ uploadUrl: string; publicUrl: string }> {
+export type PublicUpload =
+  | { mode: 'r2'; uploadUrl: string; publicUrl: string }
+  | { mode: 'cloudinary'; uploadUrl: string; fields: Record<string, string> };
+
+export async function createPublicUpload(folder: string, fileName: string, contentType: string): Promise<PublicUpload> {
   const key = publicKey(`${folder}/${safeFileName(fileName)}`);
+  if (cloudinaryEnabled()) {
+    const resource = resourceFor(contentType);
+    const publicId = resource === 'image' ? key.replace(/\.[A-Za-z0-9]+$/, '') : key;
+    return { mode: 'cloudinary', ...signedUpload(resource, 'upload', publicId) };
+  }
   const uploadUrl = await getSignedUrl(
     client(),
     new PutObjectCommand({ Bucket: env('R2_PUBLIC_BUCKET'), Key: key, ContentType: contentType }),
     { expiresIn: 600 },
   );
-  return { uploadUrl, publicUrl: `${publicBase()}/${key}` };
+  return { mode: 'r2', uploadUrl, publicUrl: `${publicBase()}/${key}` };
 }
 
 /** True only for files held in our own storage (guards server-side fetches). */
 export function isStoredFileUrl(url: string): boolean {
   if (/^\/uploads\/[^/]+$/.test(url)) return true;
+  if (cloudinaryEnabled() && parseCloudinaryUrl(url)?.type === 'upload') return true;
   if (r2PublicEnabled() && url.startsWith(`${publicBase()}/`)) return true;
   try {
     const { protocol, hostname } = new URL(url);
@@ -131,7 +158,10 @@ export async function readFile(url: string): Promise<Buffer> {
   if (url.startsWith('/uploads/')) {
     return fs.readFile(path.join(LOCAL_DIR, path.basename(url)));
   }
-  const res = await fetch(url, { cache: 'no-store' });
+  // Cloudinary accounts block public delivery of PDFs by default; a signed server-side request still works
+  const cld = cloudinaryEnabled() ? parseCloudinaryUrl(url) : null;
+  const target = cld ? cloudinaryDownloadUrl(cld.publicId, cld.type, cld.resource) : url;
+  const res = await fetch(target, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Could not download ${url} (${res.status})`);
   return Buffer.from(await res.arrayBuffer());
 }
@@ -143,6 +173,9 @@ export async function deleteFiles(urls: (string | null | undefined)[]): Promise<
     try {
       if (url.startsWith('/uploads/')) {
         await fs.unlink(path.join(LOCAL_DIR, path.basename(url)));
+      } else if (cloudinaryEnabled() && parseCloudinaryUrl(url)) {
+        const c = parseCloudinaryUrl(url)!;
+        await cloudinaryDestroy(c.publicId, c.type, c.resource);
       } else if (r2PublicEnabled() && url.startsWith(`${publicBase()}/`)) {
         const key = decodeURIComponent(url.slice(publicBase().length + 1));
         await client().send(new DeleteObjectCommand({ Bucket: env('R2_PUBLIC_BUCKET'), Key: key }));
@@ -158,7 +191,8 @@ export async function deleteFiles(urls: (string | null | undefined)[]): Promise<
 // ── Private files (client portfolio reports) ────────────────────
 
 /** Which backend private files use right now. "none" means the host has no private storage configured. */
-export function privateStorageMode(): 'r2' | 'local' | 'none' {
+export function privateStorageMode(): 'cloudinary' | 'r2' | 'local' | 'none' {
+  if (cloudinaryEnabled()) return 'cloudinary';
   if (r2PrivateEnabled()) return 'r2';
   return isProdHost() ? 'none' : 'local';
 }
@@ -170,13 +204,26 @@ export const isPortfolioKey = (key: unknown): key is string =>
 
 const localPrivatePath = (key: string) => path.join(PRIVATE_LOCAL_DIR, path.basename(key));
 
-/** A short-lived link the browser can PUT the PDF to directly (R2 only). */
-export async function createPrivateUpload(key: string): Promise<string> {
-  return getSignedUrl(
+/** Largest portfolio PDF the current private storage accepts. */
+export function privateMaxBytes(): number {
+  return privateStorageMode() === 'cloudinary' ? CLOUDINARY_FREE_MAX_BYTES : 60 * 1024 * 1024;
+}
+
+export type PrivateUpload =
+  | { mode: 'r2'; uploadUrl: string }
+  | { mode: 'cloudinary'; uploadUrl: string; fields: Record<string, string> };
+
+/** What the browser needs to send a PDF straight to private storage (keeps big files off the app server). */
+export async function createPrivateUpload(key: string): Promise<PrivateUpload> {
+  if (privateStorageMode() === 'cloudinary') {
+    return { mode: 'cloudinary', ...signedUpload('raw', 'authenticated', key) };
+  }
+  const uploadUrl = await getSignedUrl(
     client(),
     new PutObjectCommand({ Bucket: env('R2_PRIVATE_BUCKET'), Key: key, ContentType: 'application/pdf' }),
     { expiresIn: 600 },
   );
+  return { mode: 'r2', uploadUrl };
 }
 
 /** Saves a private file from the server (local development only; production uses direct R2 uploads). */
@@ -188,6 +235,13 @@ export async function savePrivateLocal(key: string, data: Buffer): Promise<void>
 /** Size and first bytes of a stored private file, or null if it is missing. */
 export async function inspectPrivate(key: string): Promise<{ size: number; head: string } | null> {
   try {
+    if (privateStorageMode() === 'cloudinary') {
+      const size = await cloudinaryBytes(key, 'authenticated', 'raw');
+      if (size === null) return null;
+      const first = await fetch(cloudinaryDownloadUrl(key, 'authenticated'), { headers: { Range: 'bytes=0-4' }, cache: 'no-store' });
+      const bytes = Buffer.from(await first.arrayBuffer()).subarray(0, 5);
+      return { size, head: bytes.toString('latin1') };
+    }
     if (privateStorageMode() === 'r2') {
       const meta = await client().send(new HeadObjectCommand({ Bucket: env('R2_PRIVATE_BUCKET'), Key: key }));
       const first = await client().send(new GetObjectCommand({ Bucket: env('R2_PRIVATE_BUCKET'), Key: key, Range: 'bytes=0-4' }));
@@ -204,6 +258,11 @@ export async function inspectPrivate(key: string): Promise<{ size: number; head:
   } catch {
     return null;
   }
+}
+
+/** The stored private file as a response from Cloudinary (the caller streams it on to the signed-in client). */
+export async function fetchPrivateFromCloudinary(key: string): Promise<Response> {
+  return fetch(cloudinaryDownloadUrl(key, 'authenticated'), { cache: 'no-store' });
 }
 
 /** Reads a private file into memory (local development only). */
@@ -233,7 +292,9 @@ export async function privateFileUrl(key: string, fileName: string, download: bo
 export async function deletePrivate(key: string | null | undefined): Promise<void> {
   if (!key) return;
   try {
-    if (privateStorageMode() === 'r2') {
+    if (privateStorageMode() === 'cloudinary') {
+      await cloudinaryDestroy(key, 'authenticated', 'raw');
+    } else if (privateStorageMode() === 'r2') {
       await client().send(new DeleteObjectCommand({ Bucket: env('R2_PRIVATE_BUCKET'), Key: key }));
     } else {
       await fs.unlink(localPrivatePath(key));
